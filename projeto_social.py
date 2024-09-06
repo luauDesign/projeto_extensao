@@ -412,17 +412,24 @@ class ProjetoSocial(MDApp):
     def create_test_project(self, index=1):
         #alunos
         alunos_df = pd.DataFrame()
-        alunos_df['id'] = [x+1 for x in range(1+index)]
-        alunos_df['nome'] = [f'Aluno {x+1}' for x in range(1+index)]
-        alunos_df['frequencia'] = [[] for x in range(1+index)]
+        alunos_df['id'] = [x+1 for x in range(10+index)]
+        alunos_df['nome'] = [f'Aluno {x+1}' for x in range(10+index)]
+        alunos_df['frequencia'] = [[] for x in range(10+index)]
         alunos_df.index = alunos_df.id
         #eventos
         eventos_df = pd.DataFrame()
-        eventos_df['id'] = [x+1 for x in range(2+index)]
-        eventos_df['ano'] = [2022 for x in range(2+index)]
+        eventos_df['id'] = [x+1 for x in range(20+index)]
+        eventos_df['ano'] = [2022 for x in range(20+index)]
         eventos_df.index = eventos_df.id
         #constroi o projeto
-        projeto = {'nome':f'Projeto Exemplo {index}', 'alunos':alunos_df, 'eventos':eventos_df}
+        if index==0:
+            projeto = {'nome':f'Futsal Sub 16', 'alunos':alunos_df, 'eventos':eventos_df}
+        elif index==1:
+            projeto = {'nome':f'Futsal Sub 20', 'alunos':alunos_df, 'eventos':eventos_df}
+        elif index==2:
+            projeto = {'nome':f'Jiujitsu', 'alunos':alunos_df, 'eventos':eventos_df}
+        else:
+            projeto = {'nome':f'Projeto Exemplo {index+1}', 'alunos':alunos_df, 'eventos':eventos_df}
         #adiciona
         self.projetos.append(projeto)
         self.curproject = self.projetos[-1]
