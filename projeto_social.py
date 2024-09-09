@@ -15,13 +15,14 @@ from kivy.lang import Builder
 from kivy.core.window import Window
 
 #containers
+from kivy.uix.widget import Widget
 from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.screen import MDScreen
 
 #elementos
-from kivymd.uix.label import MDLabel
+from kivymd.uix.label import MDLabel, MDIcon
 from kivymd.uix.datatables import MDDataTable
 from kivymd.uix.datatables.datatables import CellRow
 from kivymd.uix.button import MDFillRoundFlatButton, MDIconButton
@@ -31,6 +32,8 @@ from kivy.uix.image import Image
 #helpers
 from kivy.metrics import dp, mm, Metrics
 
+#%% telas
+
 #define as telas pela kvlang #TODO: arrumar a ordem quando a navegação estiver pronta
 KV = '''
 MDScreenManager:
@@ -38,7 +41,7 @@ MDScreenManager:
     ProjectAlunosScreen:
     ProjectEventosScreen:
     SubjectScreen:
-    EventScreen:
+    EventScreen: 
 
 <MainScreen>:
     name: 'MainScreen'
@@ -105,45 +108,25 @@ class MainScreen(Screen):
     data_table = None
 
     def on_enter(self, *args):
-        # if self.initialized:
-        #     pass
-        
-        #TODO: alternativamente, testar se isso não é muito lento ou cria lixo na memória:
-        #todos os widgets serão descartados e recriados, mas isso pode simplificar algumas coisas
-        #as outras telas provavelmente precisarao ser assim porque o conteudo das tabelas muda
         self.clear_widgets()
         
         #recipiente principal com cor de fundo
         layout = MDBoxLayout(orientation='vertical', md_bg_color='teal')
         self.add_widget(layout)
         
-        # #imagem
-        # card = Image(source='mainbg.jpg', 
-        #              size_hint=(1, .25),
-        #              pos_hint={"top": 1, "center_x": .5})
-        # layout.add_widget(card)
-        
+        #----------------------------------------------------------------------
         #cabeçalho
-        line0 = MDBoxLayout(orientation='horizontal',
-                            size_hint=(1, None),
-                            height = dp(50),
-                            minimum_height=0)
-        layout.add_widget(line0)
+        header_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height = dp(50), minimum_height=0)
+        layout.add_widget(header_line)
         
         #titulo
-        label = MDLabel(text='Projetos',
-                        theme_text_color='Custom',
-                        font_style='H6',
-                        text_color='white',
-                        halign='center',
-                        valign='top',
-                        size_hint=(1, None)
-                        )
+        label = MDLabel(text='Projetos', theme_text_color='Custom', font_style='H6', text_color='white', halign='center', valign='top', size_hint=(1, None) )
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
-        line0.add_widget(label)
+        header_line.add_widget(label)
         
+        #----------------------------------------------------------------------
         #tabela #TODO: carregar se ja existir, ou criar se nao existir
-        data_table = MDDataTable(size_hint=(1, 1), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
+        data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
                                  column_data=[('nome', self.width),(f'', dp(0))], #a segunda coluna vazia evita um bug
                                  row_data=[(app.projetos[x]['nome'], f'') for x in range(len(app.projetos))] )
         data_table.ids.container.remove_widget(data_table.header)
@@ -153,19 +136,29 @@ class MainScreen(Screen):
         self.data_table = data_table
         layout.add_widget(data_table)
         
-        #TODO: barra inferior
+        #----------------------------------------------------------------------
+        #barra inferior #TODO: add filtros e busca
         
-        #para nao adicionar de novo
-        self.initialized = True
+        bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
+        layout.add_widget(bottom_line)
+                
+        #spacer 
+        spacer = Widget(size_hint_x=1)
+        bottom_line.add_widget(spacer)
+        
+        #botao para adicionar um novo projeto
+        event_button = MDIconButton(icon='archive-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
+        bottom_line.add_widget(event_button)
     
     def on_row_press(self, instance_table, instance_row):
-        print('on_row_press')
+        print(f'tela de projetos -> on_row_press: {instance_row.text}')
         
+        #TODO: isso sao variaveis para debuggar, pode apagar depois
         global itable, irow
         itable, irow = instance_table, instance_row
         
-        #indentify which project the row belongs to
-        #can't use the parent.children index because it loads and unloads rows dynamically
+        #indentify which project the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
         for i in range(len(app.projetos)):
             #find the project
             if app.projetos[i]['nome']==irow.text:
@@ -177,123 +170,131 @@ class MainScreen(Screen):
                 #go to the project:alunos screen
                 app.root.current = 'ProjectAlunosScreen'
 
-#para facilitar debuggar:
-itable : MDDataTable = None
-irow : CellRow = None
-
 #%% tela do projeto: alunos
 
 class ProjectAlunosScreen(Screen):
     initialized = False
     data_table = None
-
+    
     def on_pre_enter(self, *args):
         print('---Pre-Entering ProjectAlunosScreen---')
-        
-        # if self.initialized:
-        #     pass
-        
-        #TODO: alternativamente, testar se isso não é muito lento ou cria lixo na memória:
-        #todos os widgets serão descartados e recriados, mas isso pode simplificar algumas coisas
         self.clear_widgets()
         
         #recipiente principal com cor de fundo
         layout = MDBoxLayout(orientation='vertical', md_bg_color='teal')
         self.add_widget(layout)
         
+        #----------------------------------------------------------------------
         #cabeçalho
-        line0 = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height = dp(50), minimum_height=0)
-        layout.add_widget(line0)
+        header_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
+        layout.add_widget(header_line)
         
         #botao para voltar pra tela principal
-        btn0 = MDIconButton(icon='arrow-left-bold', halign='left', icon_size='32sp', icon_color='white')
-        btn0.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
-        line0.add_widget(btn0)
+        home_button = MDIconButton(icon='home', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
+        home_button.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
+        header_line.add_widget(home_button)
         
         #titulo
-        label = MDLabel(text=f'{app.curproject["nome"]} (Pessoas)',
-                        theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='top', size_hint=(1, None))
+        label = MDLabel(text=f' \n{app.curproject["nome"]}\nPessoas',
+                        theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
-        line0.add_widget(label)
-        
+        header_line.add_widget(label)
+                
         #botao para ir para a tela de eventos
-        btn0 = MDIconButton(icon='arrow-right-bold', text='Eventos', halign='right', icon_size='32sp', icon_color='white')
-        btn0.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
-        line0.add_widget(btn0)
+        event_button = MDIconButton(icon='clipboard-clock', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
+        event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
+        header_line.add_widget(event_button)
         
+        #----------------------------------------------------------------------
         #tabela #TODO: carregar se ja existir, ou criar se nao existir
         alunos_df = app.curproject['alunos'].drop(columns=['frequencia'])
-        data_table = MDDataTable(size_hint=(1, 1), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
+        data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
                                  column_data=[('id',dp(10)), ('nome',dp(200))],
                                  row_data=[(x,y) for x,y in zip(alunos_df['id'].values, alunos_df['nome'].values)] )
-        # data_table.ids.container.remove_widget(data_table.header)
         data_table.sorted_on = "ID"
         data_table.sorted_order = "ASC" #"DSC"
         data_table.bind(on_row_press=self.on_row_press)
         self.data_table = data_table
         layout.add_widget(data_table)
         
+        #----------------------------------------------------------------------
         #TODO: barra inferior
         
-        #para nao adicionar de novo
-        self.initialized = True
+        bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
+        layout.add_widget(bottom_line)
+        
+        #spacer 
+        spacer = Widget(size_hint_x=1)
+        bottom_line.add_widget(spacer)
+        
+        #botao para adicionar um novo aluno
+        event_button = MDIconButton(icon='account-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
+        bottom_line.add_widget(event_button)
     
     def on_row_press(self, instance_table, instance_row):
-        print('on_row_press')
+        print(f'tela de projeto:pessoas -> on_row_press: {instance_row.text}')
         
+        #TODO: isso sao variaveis para debuggar, pode apagar depois
         global itable, irow
         itable, irow = instance_table, instance_row
         
-        #indentify which row it is #can't use the parent.children index because only some rows exist at any time
-        for i in range(len(app.projetos)):
-            if app.projetos[i]['nome']==irow.text:
-                print(f'found row index: {i}')
-                print(app.projetos[i]['nome'])
-                print(irow.text)
+        #get the id of the row
+        if (instance_row.index % 2) == 0:
+            row_id = irow.parent.children[-irow.index-1].text
+        else:
+            row_id = irow.parent.children[-irow.index].text
+        print('row_id:', row_id)
         
-        #TODO: select the proper project table
-        #TODO: go to the project screen
+        #indentify which person the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
+        idvalues = app.curproject['alunos']['id'].values
+        for i in range(len(idvalues)):
+            #find the person
+            if f"{idvalues[i]}"==f'{row_id}':
+                print(idvalues[i], '==', row_id)
+                # set it as the current person
+                app.curpersonid = i
+                #config the transition if not already configured
+                if type(app.root.transition) != FadeTransition:
+                    app.root.transition = FadeTransition()
+                #go to the person screen
+                app.root.current = 'SubjectScreen'
 
 #%% tela do projeto: eventos
 
 class ProjectEventosScreen(Screen):
-    initialized = False
-    data_table = None
+    # data_table = None
 
     def on_pre_enter(self, *args):
         print('---Pre-Entering ProjectEventosScreen---')
-        
-        # if self.initialized:
-        #     pass
-        
-        #TODO: alternativamente, testar se isso não é muito lento ou cria lixo na memória:
-        #todos os widgets serão descartados e recriados, mas isso pode simplificar algumas coisas
         self.clear_widgets()
         
         #recipiente principal com cor de fundo
         layout = MDBoxLayout(orientation='vertical', md_bg_color='teal')
         self.add_widget(layout)
         
+        #----------------------------------------------------------------------
         #cabeçalho
-        line0 = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height = dp(50), minimum_height=0)
-        layout.add_widget(line0)
+        header_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
+        layout.add_widget(header_line)
         
         #botao para voltar pra tela principal
-        btn0 = MDIconButton(icon='arrow-left-bold', halign='left', icon_size='32sp', icon_color='white')
-        btn0.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
-        line0.add_widget(btn0)
+        home_button = MDIconButton(icon='home', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
+        home_button.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
+        header_line.add_widget(home_button)
         
         #titulo
-        label = MDLabel(text=f'{app.curproject["nome"]} (Eventos)',
-                        theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='top', size_hint=(1, None))
+        label = MDLabel(text=f'{app.curproject["nome"]}\nEventos',
+                        theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
-        line0.add_widget(label)
+        header_line.add_widget(label)
         
         #botao para ir para a tela de eventos
-        btn0 = MDIconButton(icon='arrow-right-bold', text='Eventos', halign='right', icon_size='32sp', icon_color='white')
+        btn0 = MDIconButton(icon='account-group', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
         btn0.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectAlunosScreen'))
-        line0.add_widget(btn0)
+        header_line.add_widget(btn0)
         
+        #----------------------------------------------------------------------
         #tabela #TODO: carregar se ja existir, ou criar se nao existir
         eventos_df = app.curproject['eventos']
         data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
@@ -303,30 +304,52 @@ class ProjectEventosScreen(Screen):
         data_table.sorted_on = "ID"
         data_table.sorted_order = "ASC" #"DSC"
         data_table.bind(on_row_press=self.on_row_press)
-        self.data_table = data_table
+        # self.data_table = data_table
         layout.add_widget(data_table)
         
+        #----------------------------------------------------------------------
         #TODO: barra inferior
         
-        #para nao adicionar de novo
-        self.initialized = True
+        bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
+        layout.add_widget(bottom_line)
+        
+        #spacer 
+        spacer = Widget(size_hint_x=1)
+        bottom_line.add_widget(spacer)
+        
+        #botao para adicionar um novo evento
+        event_button = MDIconButton(icon='clock-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
+        bottom_line.add_widget(event_button)
+        
     
     def on_row_press(self, instance_table, instance_row):
-        print('on_row_press')
+        print(f'tela de projeto:eventos -> on_row_press: {instance_row.text}')
         
+        #TODO: isso sao variaveis para debuggar, pode apagar depois
         global itable, irow
         itable, irow = instance_table, instance_row
         
-        #indentify which row it is #TODO: make it better if possible
-        #can't use the parent.children index because only some rows exist at any time
-        for i in range(len(app.projetos)):
-            if app.projetos[i]['nome']==irow.text:
-                print(f'found row index: {i}')
-                print(app.projetos[i]['nome'])
-                print(irow.text)
+        #get the id of the row
+        if (instance_row.index % 2) == 0:
+            row_id = irow.parent.children[-irow.index-1].text
+        else:
+            row_id = irow.parent.children[-irow.index].text
+        print('row_id:', row_id)
         
-        #TODO: select the proper project table
-        #TODO: go to the project screen
+        #indentify which person the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
+        idvalues = app.curproject['eventos']['id'].values
+        for i in range(len(idvalues)):
+            #find the person
+            if f"{idvalues[i]}"==f'{row_id}':
+                print(idvalues[i], '==', row_id)
+                # set it as the current person
+                app.cureventid = i
+                #config the transition if not already configured
+                if type(app.root.transition) != FadeTransition:
+                    app.root.transition = FadeTransition()
+                #go to the person screen
+                app.root.current = 'SubjectScreen'
 
 #%% tela de alunos/pessoas
 
@@ -374,6 +397,8 @@ class ProjetoSocial(MDApp):
     #stores the project list, each project is a dict with a name plus two pandas dataframes
     projetos = []
     curproject = None
+    curpersonid = 0
+    cureventid = 0
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -381,7 +406,7 @@ class ProjetoSocial(MDApp):
         #config
         self.theme_cls.theme_style = "Light"
         self.theme_cls.primary_palette = "Teal"
-        Metrics.fontscale = 0.8
+        Metrics.fontscale = .8
         
         #TODO: TEMP: using test data for now
         for i in range(6):
@@ -449,8 +474,11 @@ def get_table_rows(df):
 
 #TODO: muito a fazer, salvar e carregar projetos, exportar/importar csv e json...
 
-#%% test data
+#%% debug
 
+#TODO: isso sao variaveis para debuggar, pode apagar depois
+itable : MDDataTable = None
+irow : CellRow = None
 
 
 #%% run
