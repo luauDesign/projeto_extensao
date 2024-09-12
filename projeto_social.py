@@ -8,6 +8,7 @@ projetos sociais voltados a arte ou esportes
 
 #outros
 import pandas as pd
+from datetime import datetime, time
 
 #principais
 from kivymd.app import MDApp
@@ -20,6 +21,7 @@ from kivymd.uix.boxlayout import MDBoxLayout
 from kivy.uix.screenmanager import ScreenManager, Screen, FadeTransition
 from kivymd.uix.screenmanager import MDScreenManager
 from kivymd.uix.screen import MDScreen
+from kivymd.uix.dialog import MDDialog
 
 #elementos
 from kivymd.uix.label import MDLabel, MDIcon
@@ -28,9 +30,16 @@ from kivymd.uix.datatables.datatables import CellRow
 from kivymd.uix.button import MDFillRoundFlatButton, MDIconButton
 from kivymd.uix.card import MDCard
 from kivy.uix.image import Image
+from kivymd.uix.textfield import MDTextField
+from kivymd.uix.pickers import MDDatePicker, MDTimePicker
 
 #helpers
 from kivy.metrics import dp, mm, Metrics
+from kivy.properties import OptionProperty
+
+#%%configs
+
+CANCEL_BUTTON_COLOR = (1,.25,.2,1)
 
 #%% telas
 
@@ -59,6 +68,8 @@ MDScreenManager:
     name: 'EventScreen'
 '''
 
+from kivymd.uix.pickers.timepicker.timepicker import TimeInput
+
 #%% helpers
 
 '''
@@ -77,6 +88,23 @@ kivymd.uix.datatables.datatables.MDDataTable
                                 0: kivymd.uix.label.label.MDLabel
                         1: kivymd.uix.selectioncontrol.selectioncontrol.MDCheckbox
                             0: kivymd.uix.label.label.MDLabel
+
+estrutura do timepicker:
+------------------------
+kivymd.uix.pickers.timepicker.timepicker.MDTimePicker
+    0: kivymd.uix.relativelayout.MDRelativeLayout
+        0: kivymd.uix.button.button.MDFlatButton ('OK')
+        1: kivymd.uix.button.button.MDFlatButton ('CANCEL')
+        2: kivymd.uix.button.button.MDIconButton (keyboard icon)
+        3: kivymd.uix.pickers.timepicker.timepicker.CircularSelector
+        4: kivymd.uix.pickers.timepicker.timepicker.AmPmSelector
+        5: kivy.factory.TimeInputLabel ('Minute')
+        6: kivy.factory.TimeInputLabel ('Hour')
+        7: kivymd.uix.pickers.timepicker.timepicker.TimeInput ('HH:mm')
+            0: kivymd.uix.pickers.timepicker.timepicker.TimeInputTextField (HH)
+            1: kivymd.uix.label.label.MDLabel (':')
+            2: kivymd.uix.pickers.timepicker.timepicker.TimeInputTextField (mm)
+        8: kivymd.uix.label.label.MDLabel ('Escolha a Hora')
 '''
 
 #TODO: fazer isso funcionar
@@ -104,9 +132,8 @@ def adjust_row_heights(data_table, *args):
 
 # Main Screen Class
 class MainScreen(Screen):
-    initialized = False
     data_table = None
-
+    
     def on_enter(self, *args):
         self.clear_widgets()
         
@@ -148,32 +175,77 @@ class MainScreen(Screen):
         
         #botao para adicionar um novo projeto
         event_button = MDIconButton(icon='archive-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
-        event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
+        event_button.bind(on_release=self.on_add_row)
         bottom_line.add_widget(event_button)
     
+    #--------------------------------------------------------------------------
+    #quando o usuário toca numa celula da tabela
     def on_row_press(self, instance_table, instance_row):
         print(f'tela de projetos -> on_row_press: {instance_row.text}')
         
         #TODO: isso sao variaveis para debuggar, pode apagar depois
-        global itable, irow
+        global itable, irow 
         itable, irow = instance_table, instance_row
         
         #indentify which project the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
         for i in range(len(app.projetos)):
-            #find the project
             if app.projetos[i]['nome']==irow.text:
-                #set it as the current project
+                #set it as the current project and switch to the project screen
                 app.curproject = app.projetos[i]
-                #config the transition if not already configured
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
-                #go to the project:alunos screen
                 app.root.current = 'ProjectAlunosScreen'
+    
+    #--------------------------------------------------------------------------
+    #popup do botao de adicionar projeto
+    def on_add_row(self, button):
+        #campo de texto para o nome
+        self.new_row_name_field = MDTextField(hint_text="Digite um nome para o projeto", required=True)
+        
+        #função para verificar se há texto no campo, para habilitar e desabilitar o botao confirmar
+        self.new_row_name_field.bind(text=self.on_new_name_text_changed)
+        
+        #botão confirmar (inicialmente desabilitado
+        self.new_row_confirm_button = MDFillRoundFlatButton(
+            text="Confirmar", on_release=self.confirm_row_creation, disabled=True)
+        
+        #botao cancelar
+        self.new_row_cancel_button = MDFillRoundFlatButton(
+            text="Cancelar", on_release=self.cancel_row_creation, md_bg_color=CANCEL_BUTTON_COLOR)
+        
+        #monta e abre a caixa de dialogo
+        self.new_row_dialog = MDDialog(
+            title="Criar novo projeto",
+            type="custom", elevation=1,
+            content_cls=self.new_row_name_field,
+            buttons=[self.new_row_cancel_button,
+                     self.new_row_confirm_button],
+            )
+        self.new_row_dialog.open()
+        
+    def on_new_name_text_changed(self, instance, value):
+        self.new_row_confirm_button.disabled = not value.strip()
+    
+    def cancel_row_creation(self, *args):
+        self.new_row_dialog.dismiss()
+    
+    def confirm_row_creation(self, *args):
+        print('criando novo projeto!')
+        name_input = self.new_row_name_field.text
+        
+        #TODO: cria a row na tabela do kivymd
+        
+        #TODO: cria a row no dataframe
+        
+        
+        #fecha a caixa
+        self.new_row_dialog.dismiss()
+
+    
 
 #%% tela do projeto: alunos
 
 class ProjectAlunosScreen(Screen):
-    initialized = False
     data_table = None
     
     def on_pre_enter(self, *args):
@@ -195,11 +267,11 @@ class ProjectAlunosScreen(Screen):
         header_line.add_widget(home_button)
         
         #titulo
-        label = MDLabel(text=f' \n{app.curproject["nome"]}\nPessoas',
+        label = MDLabel(text=f' \n{app.curproject["nome"]}',
                         theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
         header_line.add_widget(label)
-                
+        
         #botao para ir para a tela de eventos
         event_button = MDIconButton(icon='clipboard-clock', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
         event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
@@ -218,7 +290,7 @@ class ProjectAlunosScreen(Screen):
         layout.add_widget(data_table)
         
         #----------------------------------------------------------------------
-        #TODO: barra inferior
+        #barra inferior
         
         bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(bottom_line)
@@ -229,9 +301,11 @@ class ProjectAlunosScreen(Screen):
         
         #botao para adicionar um novo aluno
         event_button = MDIconButton(icon='account-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
-        event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
+        event_button.bind(on_release=self.on_add_row)
         bottom_line.add_widget(event_button)
     
+    #--------------------------------------------------------------------------
+    #quando o usuário toca numa celula da tabela
     def on_row_press(self, instance_table, instance_row):
         print(f'tela de projeto:pessoas -> on_row_press: {instance_row.text}')
         
@@ -246,24 +320,68 @@ class ProjectAlunosScreen(Screen):
             row_id = irow.parent.children[-irow.index].text
         print('row_id:', row_id)
         
-        #indentify which person the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
+        #identify which person the row belongs to
+        #por enquanto só para 2 colunas, com a primeira especificamente sendo 'id'
         idvalues = app.curproject['alunos']['id'].values
         for i in range(len(idvalues)):
-            #find the person
             if f"{idvalues[i]}"==f'{row_id}':
-                print(idvalues[i], '==', row_id)
-                # set it as the current person
+                #set it as the current person and go to the screen
                 app.curpersonid = i
-                #config the transition if not already configured
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
-                #go to the person screen
                 app.root.current = 'SubjectScreen'
+    
+    #--------------------------------------------------------------------------
+    #popup do botao de adicionar pessoa
+    def on_add_row(self, button):
+        #campo de texto para o nome
+        self.new_row_name_field = MDTextField(hint_text="Digite um nome para a pessoa", required=True)
+        
+        #função para verificar se há texto no campo, para habilitar e desabilitar o botao confirmar
+        self.new_row_name_field.bind(text=self.on_new_name_text_changed)
+        
+        #botão confirmar (inicialmente desabilitado
+        self.new_row_confirm_button = MDFillRoundFlatButton(
+            text="Confirmar", on_release=self.confirm_row_creation, disabled=True)
+        
+        #botao cancelar
+        self.new_row_cancel_button = MDFillRoundFlatButton(
+            text="Cancelar", on_release=self.cancel_row_creation, md_bg_color=CANCEL_BUTTON_COLOR)
+        
+        #monta e abre a caixa de dialogo
+        self.new_row_dialog = MDDialog(
+            title="Registrar nova pessoa",
+            type="custom", elevation=1,
+            content_cls=self.new_row_name_field,
+            buttons=[self.new_row_cancel_button,
+                     self.new_row_confirm_button],
+            )
+        self.new_row_dialog.open()
+        
+    def on_new_name_text_changed(self, instance, value):
+        self.new_row_confirm_button.disabled = not value.strip()
+    
+    def cancel_row_creation(self, *args):
+        self.new_row_dialog.dismiss()
+    
+    def confirm_row_creation(self, *args):
+        print('criando novo aluno!')
+        name_input = self.new_row_name_field.text
+        
+        #TODO: cria a row na tabela do kivymd
+        
+        #TODO: cria a row no dataframe
+        
+        
+        #fecha a caixa
+        self.new_row_dialog.dismiss()
 
 #%% tela do projeto: eventos
 
 class ProjectEventosScreen(Screen):
-    # data_table = None
+    data_table = None
+    picked_date = None
+    picked_time = None
 
     def on_pre_enter(self, *args):
         print('---Pre-Entering ProjectEventosScreen---')
@@ -284,7 +402,7 @@ class ProjectEventosScreen(Screen):
         header_line.add_widget(home_button)
         
         #titulo
-        label = MDLabel(text=f'{app.curproject["nome"]}\nEventos',
+        label = MDLabel(text=f'{app.curproject["nome"]}',
                         theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
         header_line.add_widget(label)
@@ -304,12 +422,11 @@ class ProjectEventosScreen(Screen):
         data_table.sorted_on = "ID"
         data_table.sorted_order = "ASC" #"DSC"
         data_table.bind(on_row_press=self.on_row_press)
-        # self.data_table = data_table
+        self.data_table = data_table
         layout.add_widget(data_table)
         
         #----------------------------------------------------------------------
-        #TODO: barra inferior
-        
+        #barra inferior
         bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(bottom_line)
         
@@ -319,10 +436,10 @@ class ProjectEventosScreen(Screen):
         
         #botao para adicionar um novo evento
         event_button = MDIconButton(icon='clock-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
-        event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
+        event_button.bind(on_release=self.on_add_row)
         bottom_line.add_widget(event_button)
-        
     
+    #--------------------------------------------------------------------------
     def on_row_press(self, instance_table, instance_row):
         print(f'tela de projeto:eventos -> on_row_press: {instance_row.text}')
         
@@ -337,7 +454,8 @@ class ProjectEventosScreen(Screen):
             row_id = irow.parent.children[-irow.index].text
         print('row_id:', row_id)
         
-        #indentify which person the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
+        #indentify which person the row belongs to
+        #por enquanto só para 2 colunas, com a primeira especificamente sendo 'id'
         idvalues = app.curproject['eventos']['id'].values
         for i in range(len(idvalues)):
             #find the person
@@ -349,27 +467,90 @@ class ProjectEventosScreen(Screen):
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
                 #go to the person screen
-                app.root.current = 'SubjectScreen'
+                app.root.current = 'EventScreen'
+    
+    #--------------------------------------------------------------------------
+    #popups do botao de adicionar evento
+    def on_add_row(self, button):
+        self.show_date_picker()
+        # self.show_time_picker() #TODO: TEMP enquanto debuga o time picker
+
+    def show_date_picker(self):
+        date_dialog = MDDatePicker(elevation=1)
+        date_dialog.bind(on_save=self.on_confirm_date)
+        date_dialog.open()
+    
+    def on_confirm_date(self, instance, value, date_range):
+        '''
+        :type instance: <kivymd.uix.picker.MDDatePicker object>;
+        :param value: selected date;
+        :type value: <class 'datetime.date'>;
+        :param date_range: list of 'datetime.date' objects in the selected range;
+        :type date_range: <class 'list'>;
+        '''
+        self.show_time_picker()
+
+    def show_time_picker(self):
+        time_dialog = MDTimePicker()
+        time_dialog.bind(time=self.on_change_time, on_save=self.on_confirm_time)
+        
+        #TODO: debug
+        global timepicker
+        timepicker = time_dialog
+        
+        #titulo
+        time_dialog.title = 'ESCOLHA A HORA'
+        
+        #botoes OK e CANCEL #TODO: deixar todos no mesmo padrão
+        ok_button = time_dialog.children[0].children[0]
+        ok_button.text = 'OK'
+        cancel_button = time_dialog.children[0].children[1]
+        cancel_button.text = 'CANCELA'
+        
+        #label HORA e MINUTO
+        time_dialog.children[0].children[5].text = 'Minuto'
+        time_dialog.children[0].children[6].text = 'Hora'
+        
+        #TODO: modo 24 horas, precisa extender a classe
+        
+        #done
+        time_dialog.open()
+        
+    
+    def on_change_time(self, instance, time_obj):
+        '''
+        The method returns the set time.
+        :type instance: <kivymd.uix.picker.MDTimePicker object>
+        :type time: <class 'datetime.time'>
+        '''
+        return time_obj
+    
+    def on_confirm_time(self, instance, time_obj):
+        print('criando novo evento!')
+        print('on_confirm_time:')
+        print('instance', type(instance), instance)
+        print('time_obj', type(time_obj), time_obj)
+        
+        #TODO: cria a row na tabela do kivymd
+        
+        #TODO: cria a row no dataframe
+        
+        
 
 #%% tela de alunos/pessoas
 
 # Subject Screen Class
 class SubjectScreen(Screen):
-    initialized = False
     
     def on_enter(self, *args):
-        if self.initialized:
-            pass
-        
+        print('---Pre-Entering Subject Screen---')
         self.clear_widgets()
+        
         layout = MDBoxLayout(orientation='vertical')
         self.add_widget(layout)
 
         label = MDLabel(text="Subject Screen", halign="center")
         layout.add_widget(label)
-        
-        #para nao adicionar de novo
-        self.initialized = True
 
 #%% tela de aulas/eventos
 
@@ -409,7 +590,7 @@ class ProjetoSocial(MDApp):
         Metrics.fontscale = .8
         
         #TODO: TEMP: using test data for now
-        for i in range(6):
+        for i in range(4):
             self.create_test_project(index=i)
     
     def build(self):
@@ -462,15 +643,13 @@ class ProjetoSocial(MDApp):
 
 #%% data handling
 
+#TODO: extrai as colunas do dataframe no formato que o kivymd usa
 
+#TODO: extrai as linhas do dataframe no formato que o kivymd usa
 
-#extrai as colunas do dataframe no formato que o kivymd usa
-def get_table_columns(df):
-    pass
+#TODO: add new row to data table
 
-#extrai as linhas do dataframe no formato que o kivymd usa
-def get_table_rows(df):
-    pass
+#TODO: add new row to dataframe
 
 #TODO: muito a fazer, salvar e carregar projetos, exportar/importar csv e json...
 
@@ -479,6 +658,8 @@ def get_table_rows(df):
 #TODO: isso sao variaveis para debuggar, pode apagar depois
 itable : MDDataTable = None
 irow : CellRow = None
+datepicker : MDDatePicker = None
+timepicker : MDTimePicker = None
 
 
 #%% run
