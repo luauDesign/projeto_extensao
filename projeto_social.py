@@ -7,6 +7,7 @@ projetos sociais voltados a arte ou esportes
 """
 
 #outros
+import ctypes
 import pandas as pd
 from datetime import datetime, time
 
@@ -134,7 +135,7 @@ def adjust_row_heights(data_table, *args):
 class MainScreen(Screen):
     data_table = None
     
-    def on_enter(self, *args):
+    def on_pre_enter(self, *args):
         self.clear_widgets()
         
         #recipiente principal com cor de fundo
@@ -153,8 +154,9 @@ class MainScreen(Screen):
         
         #----------------------------------------------------------------------
         #tabela #TODO: carregar se ja existir, ou criar se nao existir
-        data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
-                                 column_data=[('nome', self.width),(f'', dp(0))], #a segunda coluna vazia evita um bug
+        data_table = MDDataTable(size_hint=(1, dp(app.wsize[0])), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
+                                 use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
+                                 column_data=[('nome', dp(app.wsize[0])),(f'', 1)], #a segunda coluna vazia evita um bug
                                  row_data=[(app.projetos[x]['nome'], f'') for x in range(len(app.projetos))] )
         data_table.ids.container.remove_widget(data_table.header)
         data_table.sorted_on = "ID"
@@ -194,6 +196,7 @@ class MainScreen(Screen):
                 app.curproject = app.projetos[i]
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
+                # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
                 app.root.current = 'ProjectAlunosScreen'
     
     #--------------------------------------------------------------------------
@@ -249,7 +252,6 @@ class ProjectAlunosScreen(Screen):
     data_table = None
     
     def on_pre_enter(self, *args):
-        print('---Pre-Entering ProjectAlunosScreen---')
         self.clear_widgets()
         
         #recipiente principal com cor de fundo
@@ -280,8 +282,9 @@ class ProjectAlunosScreen(Screen):
         #----------------------------------------------------------------------
         #tabela #TODO: carregar se ja existir, ou criar se nao existir
         alunos_df = app.curproject['alunos'].drop(columns=['frequencia'])
-        data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
-                                 column_data=[('id',dp(10)), ('nome',dp(200))],
+        data_table = MDDataTable(size_hint=(1, dp(app.wsize[0])), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
+                                 use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
+                                 column_data=[('id', dp(app.wsize[0]//5+1)), ('nome', dp(app.wsize[0]*4//5+1))],
                                  row_data=[(x,y) for x,y in zip(alunos_df['id'].values, alunos_df['nome'].values)] )
         data_table.sorted_on = "ID"
         data_table.sorted_order = "ASC" #"DSC"
@@ -329,6 +332,7 @@ class ProjectAlunosScreen(Screen):
                 app.curpersonid = i
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
+                # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
                 app.root.current = 'SubjectScreen'
     
     #--------------------------------------------------------------------------
@@ -382,9 +386,8 @@ class ProjectEventosScreen(Screen):
     data_table = None
     picked_date = None
     picked_time = None
-
+    
     def on_pre_enter(self, *args):
-        print('---Pre-Entering ProjectEventosScreen---')
         self.clear_widgets()
         
         #recipiente principal com cor de fundo
@@ -415,8 +418,9 @@ class ProjectEventosScreen(Screen):
         #----------------------------------------------------------------------
         #tabela #TODO: carregar se ja existir, ou criar se nao existir
         eventos_df = app.curproject['eventos']
-        data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, use_pagination=False, rows_num=9999,
-                                 column_data=[('id',dp(10)), ('ano',dp(200))],
+        data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
+                                 use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
+                                 column_data=[('id', dp(app.wsize[0]//5+1)), ('ano', dp(app.wsize[0]*4//5+1))],
                                  row_data=[(x,y) for x,y in zip(eventos_df['id'].values, eventos_df['ano'].values)] )
         # data_table.ids.container.remove_widget(data_table.header)
         data_table.sorted_on = "ID"
@@ -434,8 +438,8 @@ class ProjectEventosScreen(Screen):
         spacer = Widget(size_hint_x=1)
         bottom_line.add_widget(spacer)
         
-        #botao para adicionar um novo evento
-        event_button = MDIconButton(icon='clock-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        #botao para adicionar um novo evento(clock-plus, calendar-plus)
+        event_button = MDIconButton(icon='calendar-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
         event_button.bind(on_release=self.on_add_row)
         bottom_line.add_widget(event_button)
     
@@ -467,6 +471,7 @@ class ProjectEventosScreen(Screen):
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
                 #go to the person screen
+                # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
                 app.root.current = 'EventScreen'
     
     #--------------------------------------------------------------------------
@@ -515,7 +520,6 @@ class ProjectEventosScreen(Screen):
         
         #done
         time_dialog.open()
-        
     
     def on_change_time(self, instance, time_obj):
         '''
@@ -542,35 +546,92 @@ class ProjectEventosScreen(Screen):
 # Subject Screen Class
 class SubjectScreen(Screen):
     
-    def on_enter(self, *args):
-        print('---Pre-Entering Subject Screen---')
+    def on_pre_enter(self, *args):
         self.clear_widgets()
         
-        layout = MDBoxLayout(orientation='vertical')
+        #informacoes do aluno (o id e a frequencia são ignorados na tabela)
+        aluno_df = pd.DataFrame()
+        aluno_row =  [*app.curproject['alunos'].iloc(0)[app.curpersonid].values]
+        print(aluno_row)
+        aluno_id = aluno_row[0]
+        print(aluno_id)
+        aluno_name = aluno_row[1]
+        print(aluno_name)
+        aluno_df['column'] = [*app.curproject['alunos'].drop(columns=['id','frequencia']).columns]#[0:2]
+        aluno_df['value'] = [*app.curproject['alunos'].drop(columns=['id','frequencia']).iloc(0)[app.curpersonid].values]#[0:2]
+        print( aluno_df)
+        
+        #recipiente principal com cor de fundo
+        layout = MDBoxLayout(orientation='vertical', md_bg_color='teal')
         self.add_widget(layout)
-
-        label = MDLabel(text="Subject Screen", halign="center")
-        layout.add_widget(label)
-
+        
+        #----------------------------------------------------------------------
+        #cabeçalho
+        header_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
+        layout.add_widget(header_line)
+        
+        #botao para voltar pra tela principal
+        home_button = MDIconButton(icon='home', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
+        home_button.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
+        header_line.add_widget(home_button)
+        
+        #titulo
+        label = MDLabel(text=f'{aluno_name}',
+                        theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
+        label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
+        header_line.add_widget(label)
+        
+        #botao para voltar para a tela de alunos
+        btn0 = MDIconButton(icon='account-group', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        btn0.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectAlunosScreen'))
+        header_line.add_widget(btn0)
+        
+        #----------------------------------------------------------------------
+        #tabela #TODO: carregar se ja existir, ou criar se nao existir
+        data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
+                                 use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
+                                 column_data=[('', dp(app.wsize[0]//2+1)), ('', dp(app.wsize[0]//2+1))],
+                                 row_data=[(x,y) for x,y in zip(aluno_df['column'].values, aluno_df['value'].values)] )
+        data_table.ids.container.remove_widget(data_table.header)
+        data_table.sorted_on = "ID"
+        data_table.sorted_order = "ASC" #"DSC"
+        data_table.bind(on_row_press=self.on_row_press)
+        self.data_table = data_table
+        layout.add_widget(data_table)
+        
+        #----------------------------------------------------------------------
+        #barra inferior
+        bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
+        layout.add_widget(bottom_line)
+        
+        #spacer 
+        spacer = Widget(size_hint_x=1)
+        bottom_line.add_widget(spacer)
+        
+        #botao para adicionar um novo evento (icon: briefcase-plus, book-plus, card-plus, format-list-group-plus, notebook-plus, pen-plus, pencil-plus, plus-box)
+        event_button = MDIconButton(icon='pen-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        event_button.bind(on_release=self.on_add_row)
+        bottom_line.add_widget(event_button)
+    
+    def on_row_press(self, instance_table, instance_row):
+        pass
+    
+    def on_add_row(self, button):
+        pass
+    
 #%% tela de aulas/eventos
 
 # Event Screen Class
 class EventScreen(Screen):
-    initialized = False
     
-    def on_enter(self, *args):
-        if self.initialized:
-            pass
-        
+    def on_pre_enter(self, *args):
         self.clear_widgets()
+    
         layout = MDBoxLayout(orientation='vertical')
         self.add_widget(layout)
 
         label = MDLabel(text="Event Screen", halign="center")
         layout.add_widget(label)
-        
-        #para nao adicionar de novo
-        self.initialized = True
 
 #%% app
 
@@ -580,6 +641,7 @@ class ProjetoSocial(MDApp):
     curproject = None
     curpersonid = 0
     cureventid = 0
+    wsize = None
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -587,7 +649,17 @@ class ProjetoSocial(MDApp):
         #config
         self.theme_cls.theme_style = "Light"
         self.theme_cls.primary_palette = "Teal"
+        self.theme_cls.device_orientation = 'portrait'
         Metrics.fontscale = .8
+        
+        #TODO: TEMP para testar com tamanho de telas de mobile, e centralizar na tela do computador (precisa do self.theme_cls.device_orientation = 'portrait')
+        user32 = ctypes.windll.user32
+        Window.size = (414, 896) #iphone 11 pro max
+        Window.top = 100#(user32.GetSystemMetrics(1) - Window.height) // 2
+        Window.left = 780#(user32.GetSystemMetrics(0) - Window.width) // 2
+        
+        #rec the screen size to adjust the table columns
+        self.wsize = [Window.system_size[0]//5.8, Window.system_size[1]//5.8] #TODO: fazer pra qq aparelho
         
         #TODO: TEMP: using test data for now
         for i in range(4):
@@ -614,13 +686,15 @@ class ProjetoSocial(MDApp):
         self.curproject = self.projetos[-1]
         pass
     
-    #TODO: TEMP
+    #TODO: TEMP: cria dados de teste para começar com alguma coisa durante o desenvolvimento
     def create_test_project(self, index=1):
         #alunos
         alunos_df = pd.DataFrame()
         alunos_df['id'] = [x+1 for x in range(10+index)]
         alunos_df['nome'] = [f'Aluno {x+1}' for x in range(10+index)]
         alunos_df['frequencia'] = [[] for x in range(10+index)]
+        for i in range(7):
+            alunos_df[f'coluna{i}'] = [f'valor {i}' for x in range(10+index)]
         alunos_df.index = alunos_df.id
         #eventos
         eventos_df = pd.DataFrame()
