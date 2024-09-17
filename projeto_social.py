@@ -52,6 +52,7 @@ MDScreenManager:
     ProjectEventosScreen:
     SubjectScreen:
     EventScreen: 
+    PresenceScreen:
 
 <MainScreen>:
     name: 'MainScreen'
@@ -67,6 +68,9 @@ MDScreenManager:
 
 <EventScreen>:
     name: 'EventScreen'
+
+<PresenceScreen>:
+    name: 'PresenceScreen'
 '''
 
 from kivymd.uix.pickers.timepicker.timepicker import TimeInput
@@ -131,7 +135,6 @@ def adjust_row_heights(data_table, *args):
 
 #%% tela principal
 
-# Main Screen Class
 class MainScreen(Screen):
     data_table = None
     
@@ -229,10 +232,10 @@ class MainScreen(Screen):
     def on_new_name_text_changed(self, instance, value):
         self.new_row_confirm_button.disabled = not value.strip()
     
-    def cancel_row_creation(self, *args):
+    def cancel_row_creation(self, button):
         self.new_row_dialog.dismiss()
     
-    def confirm_row_creation(self, *args):
+    def confirm_row_creation(self, button):
         print('criando novo projeto!')
         name_input = self.new_row_name_field.text
         
@@ -365,10 +368,10 @@ class ProjectAlunosScreen(Screen):
     def on_new_name_text_changed(self, instance, value):
         self.new_row_confirm_button.disabled = not value.strip()
     
-    def cancel_row_creation(self, *args):
+    def cancel_row_creation(self, button):
         self.new_row_dialog.dismiss()
     
-    def confirm_row_creation(self, *args):
+    def confirm_row_creation(self, button):
         print('criando novo aluno!')
         name_input = self.new_row_name_field.text
         
@@ -543,7 +546,6 @@ class ProjectEventosScreen(Screen):
 
 #%% tela de alunos/pessoas
 
-# Subject Screen Class
 class SubjectScreen(Screen):
     
     def on_pre_enter(self, *args):
@@ -613,15 +615,80 @@ class SubjectScreen(Screen):
         event_button.bind(on_release=self.on_add_row)
         bottom_line.add_widget(event_button)
     
+    #--------------------------------------------------------------------------
+    #popup de edição de campo
     def on_row_press(self, instance_table, instance_row):
+        print('on edit subject')
+        #identifica a row e pega os dados no dataframe #TODO: fazer
+        col_name = 'nome do campo'
+        col_value = 'valor do campo'
+        
+        #campos de texto para o nome do campo/coluna e para o valor
+        self.column_field = MDTextField(text=str(col_name), hint_text="Nome do Camp", required=True)
+        self.value_field = MDTextField(text=str(col_value), hint_text="Valor do Campo", required=True)
+        self.fields_layout = MDBoxLayout(orientation='vertical')#, size_hint=(1, None), height=dp(100), minimum_height=0)
+        self.fields_layout.add_widget(self.column_field)
+        self.fields_layout.add_widget(self.value_field)
+        
+        #funções para verificar se há texto nos campos, para habilitar e desabilitar o botao confirmar
+        self.value_field.bind(text=self.on_edit_column_changed)
+        self.value_field.bind(text=self.on_edit_value_changed)
+        
+        #botoes confirmar (inicialmente desabilitado) e cancelar
+        self.edit_confirm_button = MDFillRoundFlatButton(
+            text="Confirmar", on_release=self.on_confirm_edit, disabled=True)
+        self.edit_cancel_button = MDFillRoundFlatButton(
+            text="Cancelar", on_release=self.on_cancel_edit, md_bg_color=CANCEL_BUTTON_COLOR)
+        
+        #monta e abre a caixa de dialogo
+        self.edit_popup = MDDialog(title="Editar campo",
+                                   type="custom", elevation=1,
+                                   size_hint=(1, None), height=dp(200), minimum_height=0,
+                                   content_cls=self.fields_layout,
+                                   buttons=[self.edit_cancel_button,
+                                            self.edit_confirm_button])
+        self.edit_popup.open()
+        
         pass
     
+    def on_edit_column_changed(self, instance, value):
+        pass
+    
+    def on_edit_value_changed(self, instance, value):
+        pass
+    
+    def on_confirm_edit(self, button):
+        print('self:', self,)
+        print('button:', button)
+        #checa se o nome da coluna mudou, se mudou, abre popup para confirmar
+        #atualiza valor na tabela
+        #atualiza valor no dataframe
+        #fecha o popup
+        self.edit_popup.dismiss()
+        pass
+    
+    def on_cancel_edit(self, button):
+        self.edit_popup.dismiss()
+    
+    #--------------------------------------------------------------------------
+    #popup do botao de adicionar campo
     def on_add_row(self, button):
         pass
     
+    def on_add_column_changed(self, instance, value):
+        pass
+    
+    def on_add_value_changed(self, instance, value):
+        pass
+    
+    def on_confirm_add(self, button):
+        self.add_popup.dismiss()
+    
+    def on_cancel_add(self, button):
+        self.add_popup.dismiss()
+    
 #%% tela de aulas/eventos
 
-# Event Screen Class
 class EventScreen(Screen):
     
     def on_pre_enter(self, *args):
@@ -631,6 +698,19 @@ class EventScreen(Screen):
         self.add_widget(layout)
 
         label = MDLabel(text="Event Screen", halign="center")
+        layout.add_widget(label)
+
+#%% tela de chamada
+
+class PresenceScreen(Screen):
+    
+    def on_pre_enter(self, *args):
+        self.clear_widgets()
+        
+        layout = MDBoxLayout(orientation='vertical')
+        self.add_widget(layout)
+        
+        label = MDLabel(text="Presence Screen", halign="center")
         layout.add_widget(label)
 
 #%% app
@@ -734,6 +814,123 @@ itable : MDDataTable = None
 irow : CellRow = None
 datepicker : MDDatePicker = None
 timepicker : MDTimePicker = None
+
+#%% save and load
+
+#------------------------------------------------------------------------------
+#option 1: JSON
+
+import json
+
+def save_as_json(project, id):
+    #cria json
+    project_copy = project.copy()
+    project_copy['alunos'] = project['alunos'].to_dict(orient='records')
+    project_copy['eventos'] = project['eventos'].to_dict(orient='records')
+    #salva
+    file_name = f"{id}_{project['name']}.json"
+    with open(file_name, 'w', encoding='utf-8') as f:
+        json.dump(project_copy, f, ensure_ascii=False, indent=4)
+
+def load_from_json(file_path):
+    #carrega
+    with open(file_path, 'r', encoding='utf-8') as f:
+        project_data = json.load(f)
+    #recria projeto
+    project_data['alunos'] = pd.DataFrame(project_data['alunos'])
+    project_data['eventos'] = pd.DataFrame(project_data['eventos'])
+    return {'name': file_path.split('_')[1].split('.')[0],
+            'alunos': project_data['alunos'],
+            'eventos': project_data['eventos'] }
+
+#------------------------------------------------------------------------------
+#option 2: combinar em um único CSV
+
+import pandas as pd
+
+def save_as_single_csv(project, file_id):
+    #combina
+    alunos = project['alunos'].copy()
+    alunos['type'] = 'alunos'
+    eventos = project['eventos'].copy()
+    eventos['type'] = 'eventos'
+    combined = pd.concat([alunos, eventos], ignore_index=True)
+    #salva
+    file_name = f"{file_id}_{project['name']}.csv"
+    combined.to_csv(file_name, index=False)
+
+def load_from_single_csv(file_path):
+    #carrega e separa
+    combined = pd.read_csv(file_path)
+    alunos = combined[combined['type'] == 'alunos'].drop(columns=['type'])
+    eventos = combined[combined['type'] == 'eventos'].drop(columns=['type'])
+    #recria projeto
+    return {'name': file_path.split('_')[1].split('.')[0],
+            'alunos': alunos, 'eventos': eventos }
+
+#------------------------------------------------------------------------------
+#option 3: dois CSVs separados
+
+import pandas as pd
+
+def save_as_two_csvs(project, file_id):
+    #nomes dos arquivos
+    project_name = project['name']
+    alunos_file = f"{file_id}_{project_name}_alunos.csv"
+    eventos_file = f"{file_id}_{project_name}_eventos.csv"
+    #salva
+    project['alunos'].to_csv(alunos_file, index=False)
+    project['eventos'].to_csv(eventos_file, index=False)
+
+def load_from_two_csvs(file_id, project_name):
+    #nomes dos arquivos
+    alunos_file = f"{file_id}_{project_name}_alunos.csv"
+    eventos_file = f"{file_id}_{project_name}_eventos.csv"
+    #carrega
+    alunos = pd.read_csv(alunos_file)
+    eventos = pd.read_csv(eventos_file)
+    #recria projeto
+    return {'name': project_name, 'alunos': alunos, 'eventos': eventos }
+
+#------------------------------------------------------------------------------
+#option 4: pickle
+
+import pickle
+
+def save_as_pickle(project, file_path):
+    with open(file_path, 'wb') as f:
+        pickle.dump(project, f)
+
+def load_from_pickle(file_path):
+    with open(file_path, 'rb') as f:
+        project = pickle.load(f)
+    return project
+
+#------------------------------------------------------------------------------
+#option 5: excel
+
+import pandas as pd
+
+def save_as_excel(project, file_id):
+    #salva em arquivo excel com duas sheets
+    file_name = f"{file_id}_{project['name']}.xlsx"
+    with pd.ExcelWriter(file_name, engine='xlsxwriter') as writer:
+        project['alunos'].to_excel(writer, sheet_name='Alunos', index=False)
+        project['eventos'].to_excel(writer, sheet_name='Eventos', index=False)
+
+def load_from_excel(file_path):
+    #carrega
+    with pd.ExcelFile(file_path) as xls:
+        alunos = pd.read_excel(xls, 'Alunos')
+        eventos = pd.read_excel(xls, 'Eventos')
+    #recria projeto
+    return {'name':file_path.split('_')[1].split('.')[0],
+            'alunos':alunos, 'eventos':eventos }
+
+
+#------------------------------------------------------------------------------
+#option 6: sincroniza com google docs na nuvem (TODO: fica pra depois)
+
 
 
 #%% run
