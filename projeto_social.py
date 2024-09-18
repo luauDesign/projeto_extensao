@@ -283,8 +283,13 @@ class ProjectAlunosScreen(Screen):
         header_line.add_widget(event_button)
         
         #----------------------------------------------------------------------
-        #tabela #TODO: carregar se ja existir, ou criar se nao existir
-        alunos_df = app.curproject['alunos'].drop(columns=['frequencia'])
+        #tabela
+        
+        #dataframe dos alunos
+        freq_cols = [col for col in app.curproject['alunos'].columns if '__freq__' in col]
+        alunos_df = app.curproject['alunos'].drop(columns=freq_cols)
+        
+        #kivymd data table
         data_table = MDDataTable(size_hint=(1, dp(app.wsize[0])), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
                                  use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
                                  column_data=[('id', dp(app.wsize[0]//5+1)), ('nome', dp(app.wsize[0]*4//5+1))],
@@ -559,8 +564,9 @@ class SubjectScreen(Screen):
         print(aluno_id)
         aluno_name = aluno_row[1]
         print(aluno_name)
-        aluno_df['column'] = [*app.curproject['alunos'].drop(columns=['id','frequencia']).columns]#[0:2]
-        aluno_df['value'] = [*app.curproject['alunos'].drop(columns=['id','frequencia']).iloc(0)[app.curpersonid].values]#[0:2]
+        freq_cols = [col for col in app.curproject['alunos'].columns if '__freq__' in col]
+        aluno_df['column'] = [*app.curproject['alunos'].drop(columns=['id',*freq_cols]).columns]
+        aluno_df['value'] = [*app.curproject['alunos'].drop(columns=['id',*freq_cols]).iloc(0)[app.curpersonid].values]
         print( aluno_df)
         
         #recipiente principal com cor de fundo
@@ -616,59 +622,123 @@ class SubjectScreen(Screen):
         bottom_line.add_widget(event_button)
     
     #--------------------------------------------------------------------------
+    #--------------------------------------------------------------------------
+    #quando o usuário toca numa celula da tabela
+    # def on_row_press(self, instance_table, instance_row):
+    #     print(f'tela de projetos -> on_row_press: {instance_row.text}')
+        
+    #     #TODO: isso sao variaveis para debuggar, pode apagar depois
+    #     global itable, irow 
+    #     itable, irow = instance_table, instance_row
+        
+    #     #indentify which project the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
+    #     for i in range(len(app.projetos)):
+    #         if app.projetos[i]['nome']==irow.text:
+    #             #set it as the current project and switch to the project screen
+    #             app.curproject = app.projetos[i]
+    #             if type(app.root.transition) != FadeTransition:
+    #                 app.root.transition = FadeTransition()
+    #             # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
+    #             app.root.current = 'ProjectAlunosScreen'
+    
+    col_name = ''
+    cur_value = ''
+    row_value = ''
+    is_campo = False
+    instance_row = None
+    col_id = None
+    cur_row = None
+    
     #popup de edição de campo
     def on_row_press(self, instance_table, instance_row):
         print('on edit subject')
-        #identifica a row e pega os dados no dataframe #TODO: fazer
-        col_name = 'nome do campo'
-        col_value = 'valor do campo'
         
-        #campos de texto para o nome do campo/coluna e para o valor
-        self.column_field = MDTextField(text=str(col_name), hint_text="Nome do Camp", required=True)
-        self.value_field = MDTextField(text=str(col_value), hint_text="Valor do Campo", required=True)
-        self.fields_layout = MDBoxLayout(orientation='vertical')#, size_hint=(1, None), height=dp(100), minimum_height=0)
-        self.fields_layout.add_widget(self.column_field)
-        self.fields_layout.add_widget(self.value_field)
+        #nao pode editar o nome da coluna "nome"
+        
+        #rec row
+        self.cur_row = instance_row
+        
+        #index par é a coluna, index impar é o valor
+        self.is_campo = instance_row.index % 2 == 0
+        
+        #descobre o numero da linha (que no df é o id da coluna)
+        self.col_id = instance_row.index // 2
+        
+        #ignora a coluna 'id' e todas as de frequencia, que nao aparecem na tabela
+        alunos_df =  app.curproject['alunos']
+        valid_columns = [col for col in alunos_df.columns if col != 'id' and not '__freq__' in col]
+        self.col_name = valid_columns[self.col_id]
+        
+        #abre excecao pra quando o o click foi para coluna?
+        row_value = alunos_df[self.col_name].values[app.curpersonid]
+        print(row_value)
+        
+        #valor da celula
+        self.cur_value = self.col_name if self.is_campo else row_value
+        
+        #campo de texto para o nome do campo/coluna e para o valor
+        self.text_field = MDTextField(text=str(self.cur_value), required=True,
+                                      hint_text='Nome do campo' if self.is_campo else f'Valor do campo')
         
         #funções para verificar se há texto nos campos, para habilitar e desabilitar o botao confirmar
-        self.value_field.bind(text=self.on_edit_column_changed)
-        self.value_field.bind(text=self.on_edit_value_changed)
+        self.text_field.bind(text=self.on_change_edit)
         
-        #botoes confirmar (inicialmente desabilitado) e cancelar
+        #botoes confirmar e cancelar
         self.edit_confirm_button = MDFillRoundFlatButton(
-            text="Confirmar", on_release=self.on_confirm_edit, disabled=True)
+            text="Confirmar", on_release=self.on_confirm_edit, disabled=False)
         self.edit_cancel_button = MDFillRoundFlatButton(
             text="Cancelar", on_release=self.on_cancel_edit, md_bg_color=CANCEL_BUTTON_COLOR)
         
-        #monta e abre a caixa de dialogo
-        self.edit_popup = MDDialog(title="Editar campo",
-                                   type="custom", elevation=1,
-                                   size_hint=(1, None), height=dp(200), minimum_height=0,
-                                   content_cls=self.fields_layout,
-                                   buttons=[self.edit_cancel_button,
-                                            self.edit_confirm_button])
-        self.edit_popup.open()
+        #campo de texto para o nome
+        self.new_row_name_field = MDTextField(hint_text="Digite um nome para a pessoa", required=True)
         
-        pass
+        #monta e abre a caixa de dialogo
+        self.edit_popup = MDDialog(
+            title=('Editar nome do campo' if self.is_campo else f'Editar valor do campo'),
+            type="custom", elevation=1,
+            content_cls=self.text_field,
+            buttons=[self.edit_cancel_button,
+                     self.edit_confirm_button],
+            )
+        self.edit_popup.open()
     
-    def on_edit_column_changed(self, instance, value):
-        pass
-    
-    def on_edit_value_changed(self, instance, value):
-        pass
-    
-    def on_confirm_edit(self, button):
-        print('self:', self,)
-        print('button:', button)
-        #checa se o nome da coluna mudou, se mudou, abre popup para confirmar
-        #atualiza valor na tabela
-        #atualiza valor no dataframe
-        #fecha o popup
-        self.edit_popup.dismiss()
-        pass
-    
+    def on_change_edit(self, instance, value):
+        self.edit_confirm_button.disabled = not value.strip()
+        
     def on_cancel_edit(self, button):
         self.edit_popup.dismiss()
+        
+    def on_confirm_edit(self, button):
+        
+        #TODO: DEBUG
+        debug(self, button)
+        
+        #se mudou o nome de uma coluna
+        if self.is_campo and self.text_field.text != self.cur_value:
+            print('mudou coluna de', self.cur_value, '/', app.curproject['alunos'].columns[self.col_id], 'para', self.text_field.text)
+            #atualiza valor na tabela
+            self.data_table.update_row(
+                    self.data_table.row_data[self.col_id],                              # old row data
+                    [self.text_field.text, self.data_table.row_data[self.col_id][1]],)  # new row data
+            #atualiza nome da coluna no dataframe
+            
+            # current_col_name = app.curproject['alunos'].columns[self.col_id]
+            app.curproject['alunos'] = app.curproject['alunos'].rename(columns={self.col_name: self.text_field.text})
+            print(app.curproject['alunos'])
+            print(app.curproject['alunos'].columns)
+            
+            
+        #se mudou o valor de um campo
+        if not self.is_campo and self.text_field.text != self.cur_value:
+            print('mudou valor de', self.cur_value, 'para', self.text_field.text)
+            #atualiza valor na tabela
+            #atualiza valor no dataframe
+            # app.curproject['alunos'].at[self.col_id, self.col_name] = self.text_field.text
+        
+        #fecha o popup
+        self.edit_popup.dismiss()
+    
+    
     
     #--------------------------------------------------------------------------
     #popup do botao de adicionar campo
@@ -754,7 +824,7 @@ class ProjetoSocial(MDApp):
         
         #cria tabelas de aluno e de eventos, com os campos fixos
         alunos_df = pd.DataFrame()
-        alunos_df.columns = ['id', 'nome', 'frequencia']
+        alunos_df.columns = ['id', 'nome']
         eventos_df = pd.DataFrame()
         eventos_df.columns = ['id', 'ano']
         
@@ -772,7 +842,7 @@ class ProjetoSocial(MDApp):
         alunos_df = pd.DataFrame()
         alunos_df['id'] = [x+1 for x in range(10+index)]
         alunos_df['nome'] = [f'Aluno {x+1}' for x in range(10+index)]
-        alunos_df['frequencia'] = [[] for x in range(10+index)]
+        alunos_df['__freq__1234'] = [[] for x in range(10+index)]
         for i in range(7):
             alunos_df[f'coluna{i}'] = [f'valor {i}' for x in range(10+index)]
         alunos_df.index = alunos_df.id
@@ -809,11 +879,11 @@ class ProjetoSocial(MDApp):
 
 #%% debug
 
-#TODO: isso sao variaveis para debuggar, pode apagar depois
-itable : MDDataTable = None
-irow : CellRow = None
-datepicker : MDDatePicker = None
-timepicker : MDTimePicker = None
+dvars = None
+
+def debug(*args):
+    global dvars
+    dvars = args
 
 #%% save and load
 
