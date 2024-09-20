@@ -728,8 +728,11 @@ class SubjectScreen(Screen):
         if not self.is_campo and self.text_field.text != self.cur_value:
             print('mudou valor de', self.cur_value, 'para', self.text_field.text)
             #atualiza valor na tabela
+            self.data_table.update_row(
+                    self.data_table.row_data[self.col_id],                              # old row data
+                    [self.data_table.row_data[self.col_id][0], self.text_field.text],)  # new row data
             #atualiza valor no dataframe
-            app.curproject['alunos'].at[self.col_id, self.col_name] = self.text_field.text
+            app.curproject['alunos'].at[app.curpersonid+1, self.col_name] = self.text_field.text #+1 porque at[] usa o index (que começa em 1)
             print(app.curproject['alunos'])
         
         #fecha o popup
