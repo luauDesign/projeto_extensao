@@ -721,19 +721,16 @@ class SubjectScreen(Screen):
                     self.data_table.row_data[self.col_id],                              # old row data
                     [self.text_field.text, self.data_table.row_data[self.col_id][1]],)  # new row data
             #atualiza nome da coluna no dataframe
-            
-            # current_col_name = app.curproject['alunos'].columns[self.col_id]
             app.curproject['alunos'] = app.curproject['alunos'].rename(columns={self.col_name: self.text_field.text})
             print(app.curproject['alunos'])
-            print(app.curproject['alunos'].columns)
-            
             
         #se mudou o valor de um campo
         if not self.is_campo and self.text_field.text != self.cur_value:
             print('mudou valor de', self.cur_value, 'para', self.text_field.text)
             #atualiza valor na tabela
             #atualiza valor no dataframe
-            # app.curproject['alunos'].at[self.col_id, self.col_name] = self.text_field.text
+            app.curproject['alunos'].at[self.col_id, self.col_name] = self.text_field.text
+            print(app.curproject['alunos'])
         
         #fecha o popup
         self.edit_popup.dismiss()
