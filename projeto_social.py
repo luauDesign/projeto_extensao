@@ -653,8 +653,6 @@ class SubjectScreen(Screen):
     def on_row_press(self, instance_table, instance_row):
         print('on edit subject')
         
-        #nao pode editar o nome da coluna "nome"
-        
         #rec row
         self.cur_row = instance_row
         
@@ -669,6 +667,10 @@ class SubjectScreen(Screen):
         valid_columns = [col for col in alunos_df.columns if col != 'id' and not '__freq__' in col]
         self.col_name = valid_columns[self.col_id]
         
+        #nao pode editar o nome da coluna "nome"
+        if self.is_campo and (self.col_name=='id' or self.col_name=='nome'):
+            return None
+        
         #abre excecao pra quando o o click foi para coluna?
         row_value = alunos_df[self.col_name].values[app.curpersonid]
         print(row_value)
@@ -677,7 +679,7 @@ class SubjectScreen(Screen):
         self.cur_value = self.col_name if self.is_campo else row_value
         
         #campo de texto para o nome do campo/coluna e para o valor
-        self.text_field = MDTextField(text=str(self.cur_value), required=True,
+        self.text_field = MDTextField(text=str(self.cur_value), required=False,
                                       hint_text='Nome do campo' if self.is_campo else f'Valor do campo')
         
         #funções para verificar se há texto nos campos, para habilitar e desabilitar o botao confirmar
@@ -689,32 +691,27 @@ class SubjectScreen(Screen):
         self.edit_cancel_button = MDFillRoundFlatButton(
             text="Cancelar", on_release=self.on_cancel_edit, md_bg_color=CANCEL_BUTTON_COLOR)
         
-        #campo de texto para o nome
-        self.new_row_name_field = MDTextField(hint_text="Digite um nome para a pessoa", required=True)
-        
         #monta e abre a caixa de dialogo
         self.edit_popup = MDDialog(
             title=('Editar nome do campo' if self.is_campo else f'Editar valor do campo'),
-            type="custom", elevation=1,
-            content_cls=self.text_field,
-            buttons=[self.edit_cancel_button,
-                     self.edit_confirm_button],
-            )
+            type="custom", elevation=1, content_cls=self.text_field,
+            buttons=[self.edit_cancel_button, self.edit_confirm_button],)
         self.edit_popup.open()
     
     def on_change_edit(self, instance, value):
-        self.edit_confirm_button.disabled = not value.strip()
+        #nao pode ter outra coluna com o mesmo nome
+        self.edit_confirm_button.disabled = self.text_field.text in app.curproject['alunos'] #not value.strip()
+        if self.text_field.text=='' and self.is_campo:
+            self.text_field.hint_text = 'O campo será apagado'
+        elif self.is_campo:
+            self.text_field.hint_text = 'Nome do campo'
         
     def on_cancel_edit(self, button):
         self.edit_popup.dismiss()
         
     def on_confirm_edit(self, button):
-        
-        #TODO: DEBUG
-        debug(self, button)
-        
-        #se mudou o nome de uma coluna
-        if self.is_campo and self.text_field.text != self.cur_value:
+        #se mudou o nome de uma coluna (diferente de '')
+        if self.is_campo and self.text_field.text != self.cur_value and self.text_field.text != '':
             print('mudou coluna de', self.cur_value, '/', app.curproject['alunos'].columns[self.col_id], 'para', self.text_field.text)
             #atualiza valor na tabela
             self.data_table.update_row(
@@ -723,6 +720,8 @@ class SubjectScreen(Screen):
             #atualiza nome da coluna no dataframe
             app.curproject['alunos'] = app.curproject['alunos'].rename(columns={self.col_name: self.text_field.text})
             print(app.curproject['alunos'])
+            #fecha o popups
+            self.edit_popup.dismiss()
             
         #se mudou o valor de um campo
         if not self.is_campo and self.text_field.text != self.cur_value:
@@ -734,28 +733,97 @@ class SubjectScreen(Screen):
             #atualiza valor no dataframe
             app.curproject['alunos'].at[app.curpersonid+1, self.col_name] = self.text_field.text #+1 porque at[] usa o index (que começa em 1)
             print(app.curproject['alunos'])
+            #fecha o popups
+            self.edit_popup.dismiss()
         
-        #fecha o popup
-        self.edit_popup.dismiss()
+        #se mudou o nome da coluna pra ''
+        if self.is_campo and self.text_field.text == '':
+            print('campo será apagado')
+            #fecha o popup
+            self.edit_popup.dismiss()
+            #abre popup para confirmar exclusao de campo
+            self.on_delete_field()
     
+    #TODO: excusao de campo
+    def on_delete_field(self):
+        #botoes confirmar (inicia desabilitado) e cancelar
+        self.delete_confirm_button = MDFillRoundFlatButton(
+            text='Confirmar', on_release=self.on_confirm_delete, disabled=False)
+        self.delete_cancel_button = MDFillRoundFlatButton(
+            text='Cancelar', on_release=self.on_cancel_delete, md_bg_color=CANCEL_BUTTON_COLOR)
+        #texto informando que apaga de todos os alunos
+        alert_message = MDLabel(
+            text="Atenção! Você está prestes a apagar permanentemente um campo de dados. Os dados do campo serão perdidos para todos os registros nesse projeto!",
+            theme_text_color="Error",
+            # halign="center",
+            size_hint_y=None,
+            height=dp(48),  # Set the height of the label
+        )
+        #popup
+        self.delete_popup = MDDialog(title='Confirmação de apagar campo', type='custom', elevation=1,
+                                    content_cls=alert_message,
+                                    buttons=[self.delete_cancel_button, self.delete_confirm_button], )
+        self.delete_popup.open()
     
+    def on_confirm_delete(self, button):
+        print('confirm delete')
+        debug(self, button)
+        
+        #remove da tabela
+        self.data_table.remove_row( self.data_table.row_data[self.col_id] )
+        #remove do dataframe
+        app.curproject['alunos'].drop(columns=[self.col_name], inplace=True)
+        #fecha popup de apagar campo
+        self.delete_popup.dismiss()
+        print(app.curproject['alunos'].columns)
+    
+    def on_cancel_delete(self, button):
+        self.delete_popup.dismiss()
     
     #--------------------------------------------------------------------------
     #popup do botao de adicionar campo
     def on_add_row(self, button):
-        pass
+        #campo de texto para o nome do campo/coluna e para o valor
+        self.text_field = MDTextField(text='', required=True, hint_text='Nome do novo campo')
+        
+        #funções para verificar se há texto no campo, para habilitar e desabilitar o botao confirmar
+        self.text_field.bind(text=self.on_change_add)
+        
+        #botoes confirmar (inicia desabilitado) e cancelar
+        self.edit_confirm_button = MDFillRoundFlatButton(
+            text='Confirmar', on_release=self.on_confirm_add, disabled=True)
+        self.edit_cancel_button = MDFillRoundFlatButton(
+            text='Cancelar', on_release=self.on_cancel_add, md_bg_color=CANCEL_BUTTON_COLOR)
+        
+        #campo de texto para o nome
+        self.new_row_name_field = MDTextField(hint_text='Digite um nome para o novo campo', required=True)
+        
+        #monta e abre a caixa de dialogo
+        self.add_popup = MDDialog( title='Criar novo campo', type='custom', elevation=1,
+                                    content_cls=self.text_field,
+                                    buttons=[self.edit_cancel_button, self.edit_confirm_button], )
+        self.add_popup.open()
     
-    def on_add_column_changed(self, instance, value):
+    def on_change_add(self, instance, value):
+        #desabilita se nao tiver nome ou ja existir outra coluna com o mesmo nome
+        self.edit_confirm_button.disabled = not value.strip() or self.text_field.text in app.curproject['alunos']
         pass
-    
-    def on_add_value_changed(self, instance, value):
-        pass
-    
-    def on_confirm_add(self, button):
-        self.add_popup.dismiss()
     
     def on_cancel_add(self, button):
         self.add_popup.dismiss()
+    
+    def on_confirm_add(self, button):
+        #add na tabela
+        self.data_table.add_row((self.text_field.text, ''))
+        #add no dataframe
+        app.curproject['alunos'][self.text_field.text] = ''
+        #fecha o popup
+        self.add_popup.dismiss()
+    
+    
+    
+    
+    
     
 #%% tela de aulas/eventos
 
