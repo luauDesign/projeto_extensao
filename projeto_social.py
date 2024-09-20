@@ -622,43 +622,18 @@ class SubjectScreen(Screen):
         bottom_line.add_widget(event_button)
     
     #--------------------------------------------------------------------------
-    #--------------------------------------------------------------------------
-    #quando o usuário toca numa celula da tabela
-    # def on_row_press(self, instance_table, instance_row):
-    #     print(f'tela de projetos -> on_row_press: {instance_row.text}')
-        
-    #     #TODO: isso sao variaveis para debuggar, pode apagar depois
-    #     global itable, irow 
-    #     itable, irow = instance_table, instance_row
-        
-    #     #indentify which project the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
-    #     for i in range(len(app.projetos)):
-    #         if app.projetos[i]['nome']==irow.text:
-    #             #set it as the current project and switch to the project screen
-    #             app.curproject = app.projetos[i]
-    #             if type(app.root.transition) != FadeTransition:
-    #                 app.root.transition = FadeTransition()
-    #             # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
-    #             app.root.current = 'ProjectAlunosScreen'
+    #popup de edicao de nome de campo ou valor de tabela
     
-    col_name = ''
-    cur_value = ''
-    row_value = ''
-    is_campo = False
-    instance_row = None
-    col_id = None
-    cur_row = None
+    # is_campo = False
+    # col_name, cur_value, row_value = None, None, None
+    # instance_row, col_id, cur_row = None, None, None
     
     #popup de edição de campo
     def on_row_press(self, instance_table, instance_row):
-        print('on edit subject')
-        
         #rec row
         self.cur_row = instance_row
-        
         #index par é a coluna, index impar é o valor
         self.is_campo = instance_row.index % 2 == 0
-        
         #descobre o numero da linha (que no df é o id da coluna)
         self.col_id = instance_row.index // 2
         
@@ -666,31 +641,25 @@ class SubjectScreen(Screen):
         alunos_df =  app.curproject['alunos']
         valid_columns = [col for col in alunos_df.columns if col != 'id' and not '__freq__' in col]
         self.col_name = valid_columns[self.col_id]
-        
         #nao pode editar o nome da coluna "nome"
         if self.is_campo and (self.col_name=='id' or self.col_name=='nome'):
             return None
-        
-        #abre excecao pra quando o o click foi para coluna?
+        #valor da coluna
         row_value = alunos_df[self.col_name].values[app.curpersonid]
-        print(row_value)
-        
         #valor da celula
         self.cur_value = self.col_name if self.is_campo else row_value
         
         #campo de texto para o nome do campo/coluna e para o valor
         self.text_field = MDTextField(text=str(self.cur_value), required=False,
+                                      helper_text='Deixe sem nome se quiser remover o campo', helper_text_mode="persistent",
                                       hint_text='Nome do campo' if self.is_campo else f'Valor do campo')
-        
         #funções para verificar se há texto nos campos, para habilitar e desabilitar o botao confirmar
         self.text_field.bind(text=self.on_change_edit)
-        
         #botoes confirmar e cancelar
         self.edit_confirm_button = MDFillRoundFlatButton(
             text="Confirmar", on_release=self.on_confirm_edit, disabled=False)
         self.edit_cancel_button = MDFillRoundFlatButton(
             text="Cancelar", on_release=self.on_cancel_edit, md_bg_color=CANCEL_BUTTON_COLOR)
-        
         #monta e abre a caixa de dialogo
         self.edit_popup = MDDialog(
             title=('Editar nome do campo' if self.is_campo else f'Editar valor do campo'),
@@ -700,11 +669,7 @@ class SubjectScreen(Screen):
     
     def on_change_edit(self, instance, value):
         #nao pode ter outra coluna com o mesmo nome
-        self.edit_confirm_button.disabled = self.text_field.text in app.curproject['alunos'] #not value.strip()
-        if self.text_field.text=='' and self.is_campo:
-            self.text_field.hint_text = 'O campo será apagado'
-        elif self.is_campo:
-            self.text_field.hint_text = 'Nome do campo'
+        self.edit_confirm_button.disabled = self.text_field.text in app.curproject['alunos']
         
     def on_cancel_edit(self, button):
         self.edit_popup.dismiss()
@@ -728,8 +693,8 @@ class SubjectScreen(Screen):
             print('mudou valor de', self.cur_value, 'para', self.text_field.text)
             #atualiza valor na tabela
             self.data_table.update_row(
-                    self.data_table.row_data[self.col_id],                              # old row data
-                    [self.data_table.row_data[self.col_id][0], self.text_field.text],)  # new row data
+                    self.data_table.row_data[self.col_id],                              #old row data
+                    [self.data_table.row_data[self.col_id][0], self.text_field.text],)  #new row data
             #atualiza valor no dataframe
             app.curproject['alunos'].at[app.curpersonid+1, self.col_name] = self.text_field.text #+1 porque at[] usa o index (que começa em 1)
             print(app.curproject['alunos'])
@@ -744,7 +709,6 @@ class SubjectScreen(Screen):
             #abre popup para confirmar exclusao de campo
             self.on_delete_field()
     
-    #TODO: excusao de campo
     def on_delete_field(self):
         #botoes confirmar (inicia desabilitado) e cancelar
         self.delete_confirm_button = MDFillRoundFlatButton(
@@ -753,22 +717,14 @@ class SubjectScreen(Screen):
             text='Cancelar', on_release=self.on_cancel_delete, md_bg_color=CANCEL_BUTTON_COLOR)
         #texto informando que apaga de todos os alunos
         alert_message = MDLabel(
-            text="Atenção! Você está prestes a apagar permanentemente um campo de dados. Os dados do campo serão perdidos para todos os registros nesse projeto!",
-            theme_text_color="Error",
-            # halign="center",
-            size_hint_y=None,
-            height=dp(48),  # Set the height of the label
-        )
+            text=f'Atenção! Você está prestes a apagar permanentemente o campo de dados "{self.col_name}". Todos os dados de "{self.col_name}" serão perdidos para todos os registros nesse projeto!',
+            theme_text_color="Error", size_hint_y=None, height=dp(55), )
         #popup
         self.delete_popup = MDDialog(title='Confirmação de apagar campo', type='custom', elevation=1,
-                                    content_cls=alert_message,
-                                    buttons=[self.delete_cancel_button, self.delete_confirm_button], )
+                                    content_cls=alert_message, buttons=[self.delete_cancel_button, self.delete_confirm_button], )
         self.delete_popup.open()
     
     def on_confirm_delete(self, button):
-        print('confirm delete')
-        debug(self, button)
-        
         #remove da tabela
         self.data_table.remove_row( self.data_table.row_data[self.col_id] )
         #remove do dataframe
@@ -782,32 +738,27 @@ class SubjectScreen(Screen):
     
     #--------------------------------------------------------------------------
     #popup do botao de adicionar campo
+    
     def on_add_row(self, button):
         #campo de texto para o nome do campo/coluna e para o valor
         self.text_field = MDTextField(text='', required=True, hint_text='Nome do novo campo')
-        
         #funções para verificar se há texto no campo, para habilitar e desabilitar o botao confirmar
         self.text_field.bind(text=self.on_change_add)
-        
         #botoes confirmar (inicia desabilitado) e cancelar
         self.edit_confirm_button = MDFillRoundFlatButton(
             text='Confirmar', on_release=self.on_confirm_add, disabled=True)
         self.edit_cancel_button = MDFillRoundFlatButton(
             text='Cancelar', on_release=self.on_cancel_add, md_bg_color=CANCEL_BUTTON_COLOR)
-        
         #campo de texto para o nome
         self.new_row_name_field = MDTextField(hint_text='Digite um nome para o novo campo', required=True)
-        
         #monta e abre a caixa de dialogo
         self.add_popup = MDDialog( title='Criar novo campo', type='custom', elevation=1,
-                                    content_cls=self.text_field,
-                                    buttons=[self.edit_cancel_button, self.edit_confirm_button], )
+                                    content_cls=self.text_field, buttons=[self.edit_cancel_button, self.edit_confirm_button], )
         self.add_popup.open()
     
     def on_change_add(self, instance, value):
         #desabilita se nao tiver nome ou ja existir outra coluna com o mesmo nome
         self.edit_confirm_button.disabled = not value.strip() or self.text_field.text in app.curproject['alunos']
-        pass
     
     def on_cancel_add(self, button):
         self.add_popup.dismiss()
@@ -819,11 +770,6 @@ class SubjectScreen(Screen):
         app.curproject['alunos'][self.text_field.text] = ''
         #fecha o popup
         self.add_popup.dismiss()
-    
-    
-    
-    
-    
     
 #%% tela de aulas/eventos
 
