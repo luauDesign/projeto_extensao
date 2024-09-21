@@ -246,8 +246,7 @@ class MainScreen(Screen):
         
         #fecha a caixa
         self.new_row_dialog.dismiss()
-
-    
+   
 
 #%% tela do projeto: alunos
 
@@ -338,6 +337,7 @@ class ProjectAlunosScreen(Screen):
             if f"{idvalues[i]}"==f'{row_id}':
                 #set it as the current person and go to the screen
                 app.curpersonid = i
+                app.curpersonindex = app.curproject['alunos']['id'].values[i]
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
                 # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
@@ -543,7 +543,7 @@ class ProjectEventosScreen(Screen):
         print('instance', type(instance), instance)
         print('time_obj', type(time_obj), time_obj)
         
-        #TODO: cria a row na tabela do kivymd
+        #TODO: cria a row na tabela
         
         #TODO: cria a row no dataframe
         
@@ -559,16 +559,11 @@ class SubjectScreen(Screen):
         #informacoes do aluno (o id e a frequencia são ignorados na tabela)
         aluno_df = pd.DataFrame()
         aluno_row =  [*app.curproject['alunos'].iloc(0)[app.curpersonid].values]
-        print(aluno_row)
         aluno_id = aluno_row[0]
-        print(aluno_id)
         aluno_name = aluno_row[1]
-        print(aluno_name)
         freq_cols = [col for col in app.curproject['alunos'].columns if '__freq__' in col]
         aluno_df['column'] = [*app.curproject['alunos'].drop(columns=['id',*freq_cols]).columns]
-        aluno_df['value'] = [*app.curproject['alunos'].drop(columns=['id',*freq_cols]).iloc(0)[app.curpersonid].values]
-        print( aluno_df)
-        
+        aluno_df['value'] = [*app.curproject['alunos'].drop(columns=['id',*freq_cols]).loc[app.curpersonindex].values]
         #recipiente principal com cor de fundo
         layout = MDBoxLayout(orientation='vertical', md_bg_color='teal')
         self.add_widget(layout)
@@ -577,25 +572,22 @@ class SubjectScreen(Screen):
         #cabeçalho
         header_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(header_line)
-        
         #botao para voltar pra tela principal
         home_button = MDIconButton(icon='home', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
         home_button.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
         header_line.add_widget(home_button)
-        
         #titulo
         label = MDLabel(text=f'{aluno_name}',
                         theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
         header_line.add_widget(label)
-        
         #botao para voltar para a tela de alunos
         btn0 = MDIconButton(icon='account-group', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
         btn0.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectAlunosScreen'))
         header_line.add_widget(btn0)
         
         #----------------------------------------------------------------------
-        #tabela #TODO: carregar se ja existir, ou criar se nao existir
+        #tabela
         data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
                                  use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
                                  column_data=[('', dp(app.wsize[0]//2+1)), ('', dp(app.wsize[0]//2+1))],
@@ -611,24 +603,20 @@ class SubjectScreen(Screen):
         #barra inferior
         bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(bottom_line)
-        
-        #spacer 
-        spacer = Widget(size_hint_x=1)
-        bottom_line.add_widget(spacer)
-        
-        #botao para adicionar um novo evento (icon: briefcase-plus, book-plus, card-plus, format-list-group-plus, notebook-plus, pen-plus, pencil-plus, plus-box)
-        event_button = MDIconButton(icon='pen-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
-        event_button.bind(on_release=self.on_add_row)
-        bottom_line.add_widget(event_button)
+        #botao para apagar o aluno
+        delete_button = MDIconButton(icon='account-minus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        delete_button.bind(on_release=self.open_delete_aluno_popup)
+        bottom_line.add_widget(delete_button)
+        #spacer
+        bottom_line.add_widget( Widget(size_hint_x=1) )
+        #botao para adicionar um novo aluno
+        add_button = MDIconButton(icon='pen-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        add_button.bind(on_release=self.open_add_field_popup)
+        bottom_line.add_widget(add_button)
     
     #--------------------------------------------------------------------------
     #popup de edicao de nome de campo ou valor de tabela
     
-    # is_campo = False
-    # col_name, cur_value, row_value = None, None, None
-    # instance_row, col_id, cur_row = None, None, None
-    
-    #popup de edição de campo
     def on_row_press(self, instance_table, instance_row):
         #rec row
         self.cur_row = instance_row
@@ -636,22 +624,22 @@ class SubjectScreen(Screen):
         self.is_campo = instance_row.index % 2 == 0
         #descobre o numero da linha (que no df é o id da coluna)
         self.col_id = instance_row.index // 2
-        
-        #ignora a coluna 'id' e todas as de frequencia, que nao aparecem na tabela
+        #a coluna 'id' e as colunas de frequencia nao aparecem na tabela
         alunos_df =  app.curproject['alunos']
         valid_columns = [col for col in alunos_df.columns if col != 'id' and not '__freq__' in col]
         self.col_name = valid_columns[self.col_id]
-        #nao pode editar o nome da coluna "nome"
+        #nao pode renomear ou apagar a coluna "nome", apenas seu valor
         if self.is_campo and (self.col_name=='id' or self.col_name=='nome'):
             return None
         #valor da coluna
-        row_value = alunos_df[self.col_name].values[app.curpersonid]
+        row_value = alunos_df.loc[app.curpersonindex, self.col_name]
+        print('row value:', row_value)
         #valor da celula
         self.cur_value = self.col_name if self.is_campo else row_value
         
-        #campo de texto para o nome do campo/coluna e para o valor
+        #campo de texto para editar nome ou valor da coluna
         self.text_field = MDTextField(text=str(self.cur_value), required=False,
-                                      helper_text='Deixe sem nome se quiser remover o campo', helper_text_mode="persistent",
+                                      helper_text='Deixe vazio para remover o campo', helper_text_mode="persistent",
                                       hint_text='Nome do campo' if self.is_campo else f'Valor do campo')
         #funções para verificar se há texto nos campos, para habilitar e desabilitar o botao confirmar
         self.text_field.bind(text=self.on_change_edit)
@@ -675,41 +663,34 @@ class SubjectScreen(Screen):
         self.edit_popup.dismiss()
         
     def on_confirm_edit(self, button):
-        #se mudou o nome de uma coluna (diferente de '')
+        #se mudou o nome de uma coluna (mas nao deixou vazio)
         if self.is_campo and self.text_field.text != self.cur_value and self.text_field.text != '':
             print('mudou coluna de', self.cur_value, '/', app.curproject['alunos'].columns[self.col_id], 'para', self.text_field.text)
-            #atualiza valor na tabela
-            self.data_table.update_row(
+            self.data_table.update_row( #atualiza valor na tabela
                     self.data_table.row_data[self.col_id],                              # old row data
                     [self.text_field.text, self.data_table.row_data[self.col_id][1]],)  # new row data
-            #atualiza nome da coluna no dataframe
-            app.curproject['alunos'] = app.curproject['alunos'].rename(columns={self.col_name: self.text_field.text})
-            print(app.curproject['alunos'])
-            #fecha o popups
-            self.edit_popup.dismiss()
+            app.curproject['alunos'] = app.curproject['alunos'].rename(columns={self.col_name: self.text_field.text}) #atualiza nome da coluna no dataframe
+            self.edit_popup.dismiss()   #fecha o popup
             
         #se mudou o valor de um campo
         if not self.is_campo and self.text_field.text != self.cur_value:
-            print('mudou valor de', self.cur_value, 'para', self.text_field.text)
             #atualiza valor na tabela
             self.data_table.update_row(
                     self.data_table.row_data[self.col_id],                              #old row data
                     [self.data_table.row_data[self.col_id][0], self.text_field.text],)  #new row data
             #atualiza valor no dataframe
-            app.curproject['alunos'].at[app.curpersonid+1, self.col_name] = self.text_field.text #+1 porque at[] usa o index (que começa em 1)
-            print(app.curproject['alunos'])
-            #fecha o popups
-            self.edit_popup.dismiss()
+            app.curproject['alunos'].at[app.curpersonindex, self.col_name] = self.text_field.text
+            self.edit_popup.dismiss() #fecha o popup
         
-        #se mudou o nome da coluna pra ''
+        #se deixou o nome da coluna vazio, abre a confirmação de apagar
         if self.is_campo and self.text_field.text == '':
-            print('campo será apagado')
-            #fecha o popup
-            self.edit_popup.dismiss()
-            #abre popup para confirmar exclusao de campo
-            self.on_delete_field()
+            self.edit_popup.dismiss()   #fecha o popup
+            self.open_delete_field_popup()  #abre popup para confirmar exclusao de campo
     
-    def on_delete_field(self):
+    #--------------------------------------------------------------------------
+    #popup para deletar campo
+    
+    def open_delete_field_popup(self):
         #botoes confirmar (inicia desabilitado) e cancelar
         self.delete_confirm_button = MDFillRoundFlatButton(
             text='Confirmar', on_release=self.on_confirm_delete, disabled=False)
@@ -725,13 +706,9 @@ class SubjectScreen(Screen):
         self.delete_popup.open()
     
     def on_confirm_delete(self, button):
-        #remove da tabela
-        self.data_table.remove_row( self.data_table.row_data[self.col_id] )
-        #remove do dataframe
-        app.curproject['alunos'].drop(columns=[self.col_name], inplace=True)
-        #fecha popup de apagar campo
+        self.data_table.remove_row( self.data_table.row_data[self.col_id] )     #remove da tabela
+        app.curproject['alunos'].drop(columns=[self.col_name], inplace=True)    #remove do dataframe
         self.delete_popup.dismiss()
-        print(app.curproject['alunos'].columns)
     
     def on_cancel_delete(self, button):
         self.delete_popup.dismiss()
@@ -739,11 +716,9 @@ class SubjectScreen(Screen):
     #--------------------------------------------------------------------------
     #popup do botao de adicionar campo
     
-    def on_add_row(self, button):
-        #campo de texto para o nome do campo/coluna e para o valor
-        self.text_field = MDTextField(text='', required=True, hint_text='Nome do novo campo')
-        #funções para verificar se há texto no campo, para habilitar e desabilitar o botao confirmar
-        self.text_field.bind(text=self.on_change_add)
+    def open_add_field_popup(self, button):
+        self.text_field = MDTextField(text='', required=True, hint_text='Nome do novo campo')   #campo de texto para o nome do campo/coluna e para o valor
+        self.text_field.bind(text=self.on_change_add)   #funcaos para verificar se há texto no campo para habilitar e desabilitar o botao confirmar
         #botoes confirmar (inicia desabilitado) e cancelar
         self.edit_confirm_button = MDFillRoundFlatButton(
             text='Confirmar', on_release=self.on_confirm_add, disabled=True)
@@ -751,25 +726,52 @@ class SubjectScreen(Screen):
             text='Cancelar', on_release=self.on_cancel_add, md_bg_color=CANCEL_BUTTON_COLOR)
         #campo de texto para o nome
         self.new_row_name_field = MDTextField(hint_text='Digite um nome para o novo campo', required=True)
-        #monta e abre a caixa de dialogo
+        #popup
         self.add_popup = MDDialog( title='Criar novo campo', type='custom', elevation=1,
                                     content_cls=self.text_field, buttons=[self.edit_cancel_button, self.edit_confirm_button], )
         self.add_popup.open()
     
     def on_change_add(self, instance, value):
-        #desabilita se nao tiver nome ou ja existir outra coluna com o mesmo nome
+        #desabilita botao confirmar se nao tiver nome ou ja existir outra coluna com o mesmo nome
         self.edit_confirm_button.disabled = not value.strip() or self.text_field.text in app.curproject['alunos']
     
     def on_cancel_add(self, button):
         self.add_popup.dismiss()
     
     def on_confirm_add(self, button):
-        #add na tabela
-        self.data_table.add_row((self.text_field.text, ''))
-        #add no dataframe
-        app.curproject['alunos'][self.text_field.text] = ''
-        #fecha o popup
+        self.data_table.add_row((self.text_field.text, ''))     #add na tabela
+        app.curproject['alunos'][self.text_field.text] = ''     #add no dataframe
         self.add_popup.dismiss()
+    
+    #--------------------------------------------------------------------------
+    #TODO: popup do botao de excluir aluno
+    
+    def open_delete_aluno_popup(self, button):
+        debug(self, button)
+        #botoes confirmar (inicia desabilitado) e cancelar
+        self.delete_aluno_confirm_button = MDFillRoundFlatButton(
+            text='Confirmar', on_release=self.on_confirm_delete_aluno, disabled=False)
+        self.delete_aluno_cancel_button = MDFillRoundFlatButton(
+            text='Cancelar', on_release=self.on_cancel_delete_aluno, md_bg_color=CANCEL_BUTTON_COLOR)
+        #texto informando que apaga de todos os alunos
+        nome_do_aluno = app.curproject['alunos'].loc[app.curpersonindex, 'nome']
+        alert_message = MDLabel(
+            text=f'Atenção! Você está prestes a apagar permanentemente o registro de "{nome_do_aluno}" no projeto "{app.curproject["nome"]}"! Não será possível desfazer esta ação!',
+            theme_text_color="Error", size_hint_y=None, height=dp(55), )
+        #popup
+        self.delete_aluno_popup = MDDialog(title='Confirmação de apagar registro', type='custom', elevation=1,
+                                    content_cls=alert_message, buttons=[self.delete_aluno_cancel_button, self.delete_aluno_confirm_button], )
+        self.delete_aluno_popup.open()
+    
+    def on_cancel_delete_aluno(self, button):
+        self.delete_aluno_popup.dismiss()
+    
+    def on_confirm_delete_aluno(self, button):
+        app.curproject['alunos'] = app.curproject['alunos'].drop(app.curpersonindex)    #exclui no dataframe
+        ### app.curproject['alunos'].reset_index(drop=True, inplace=True)               #reseta o index para não deixar buracos (cria outros problemas entao deixa sem)
+        self.delete_aluno_popup.dismiss()                       #fecha popup       
+        setattr(app.root, 'current', 'ProjectAlunosScreen')     #volta pra tela anterior
+        
     
 #%% tela de aulas/eventos
 
@@ -803,8 +805,8 @@ class ProjetoSocial(MDApp):
     #stores the project list, each project is a dict with a name plus two pandas dataframes
     projetos = []
     curproject = None
-    curpersonid = 0
-    cureventid = 0
+    curpersonid, curpersonindex = 0, 0
+    cureventid, cureventindex = 0, 0
     wsize = None
     
     def __init__(self, **kwargs):
