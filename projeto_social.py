@@ -331,7 +331,7 @@ class ProjectAlunosScreen(Screen):
         #add na tabela
         app.curproject['lastpersonid'] = app.curproject['lastpersonid'] + 1
         self.data_table.add_row((app.curproject['lastpersonid'], self.text_field.text))
-        #add no dataframe (depis recria o index que vai perder na adicao)
+        #add no dataframe (depois recria o index que vai perder na adicao)
         app.curproject['alunos'] = app.curproject['alunos']._append(
             {'id':app.curproject['lastpersonid'], 'nome':self.text_field.text}, ignore_index=True)
         app.curproject['alunos'].index = app.curproject['alunos'].id
@@ -368,9 +368,6 @@ class ProjectAlunosScreen(Screen):
 #%% tela do projeto: eventos
 
 class ProjectEventosScreen(Screen):
-    # data_table = None
-    # picked_date = None
-    # picked_time = None
     
     def on_pre_enter(self, *args):
         self.clear_widgets()
@@ -402,8 +399,8 @@ class ProjectEventosScreen(Screen):
         eventos_df = app.curproject['eventos']
         data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
                                  use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
-                                 column_data=[('id', dp(app.wsize[0]//5+1)), ('ano', dp(app.wsize[0]*4//5+1))],
-                                 row_data=[(x,y) for x,y in zip(eventos_df['id'].values, eventos_df['ano'].values)] )
+                                 column_data=[('id', dp(app.wsize[0]//5+1)), ('data', dp(app.wsize[0]*2//5+1)), ('hora', dp(app.wsize[0]*2//5+1))],
+                                 row_data=[(x,y) for x,y in zip(eventos_df['id'].values, eventos_df['data'].values, eventos_df['hora'].values)] )
         # data_table.ids.container.remove_widget(data_table.header)
         data_table.sorted_on = "ID"
         data_table.sorted_order = "ASC" #ascending/descending
@@ -415,6 +412,10 @@ class ProjectEventosScreen(Screen):
         #barra inferior
         bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(bottom_line)
+        #botao para apagar o projeto
+        delete_project_button = MDIconButton(icon='archive-minus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        delete_project_button.bind(on_release=self.show_delete_project_popup)
+        bottom_line.add_widget(delete_project_button)
         #spacer
         bottom_line.add_widget( Widget(size_hint_x=1) )
         #botao para adicionar um novo evento(clock-plus, calendar-plus)
@@ -429,10 +430,9 @@ class ProjectEventosScreen(Screen):
         
         #get the id of the row
         if (instance_row.index % 2) == 0:
-            row_id = irow.parent.children[-irow.index-1].text
+            row_id = instance_row.parent.children[-instance_row.index-1].text
         else:
-            row_id = irow.parent.children[-irow.index].text
-        print('row_id:', row_id)
+            row_id = instance_row.parent.children[-instance_row.index].text
         
         #indentify which event the row belongs to #por enquanto só para 2 colunas, com a primeira especificamente sendo 'id'
         idvalues = app.curproject['eventos']['id'].values
@@ -454,13 +454,15 @@ class ProjectEventosScreen(Screen):
         self.show_date_picker()
 
     def show_date_picker(self):
+        app.theme_cls.device_orientation = 'portrait'
         date_dialog = MDDatePicker(elevation=1)
         date_dialog.bind(on_save=self.on_confirm_date)
         date_dialog.open()
     
     def on_confirm_date(self, instance, value, date_range):
+        self.new_event_date = value
         self.show_time_picker()
-
+        
     def show_time_picker(self):
         time_dialog = MDTimePicker()
         time_dialog.bind(time=self.on_change_time, on_save=self.on_confirm_time)
@@ -482,15 +484,46 @@ class ProjectEventosScreen(Screen):
     
     def on_confirm_time(self, instance, time_obj):
         print('criando novo evento!')
-        print('on_confirm_time:')
-        print('instance', type(instance), instance)
-        print('time_obj', type(time_obj), time_obj)
+        debug(self, instance, time_obj)
+        data_e_hora = datetime.combine(self.new_event_date, time_obj)
         
-        #TODO: cria a row na tabela
+        #add na tabela
+        app.curproject['lasteventid'] = app.curproject['lasteventid'] + 1
+        self.data_table.add_row((app.curproject['lasteventid'], self.new_event_date, time_obj))
         
-        #TODO: cria a row no dataframe
+        #add no dataframe (depois recria o index que vai perder na adicao)
+        app.curproject['eventos'] = app.curproject['eventos']._append(
+            {'id':app.curproject['lasteventid'], 
+             'data':self.new_event_date, 'hora':time_obj}, ignore_index=True)
+        app.curproject['eventos'].index = app.curproject['eventos'].id
         
         
+    #--------------------------------------------------------------------------
+    #popup de deletar o projeto (copiado da tela de aluno)
+    
+    def show_delete_project_popup(self, button):
+        #botoes confirmar (inicia desabilitado) e cancelar
+        self.delete_confirm_button = MDFillRoundFlatButton(
+            text='Confirmar', on_release=self.on_confirm_delete_project, disabled=False)
+        self.delete_cancel_button = MDFillRoundFlatButton(
+            text='Cancelar', on_release=self.on_cancel_delete_project, md_bg_color=CANCEL_BUTTON_COLOR)
+        #texto informando que apaga permanentemente o projeto
+        alert_message = MDLabel(
+            text=f'Atenção! Você está prestes a apagar permanentemente o projeto "{app.curproject["nome"]}". Todos os dados do projeto serão perdidos!',
+            theme_text_color="Error", size_hint_y=None, height=dp(55), )
+        #popup
+        self.delete_project_popup = MDDialog(title='Confirmação de apagar campo', type='custom', elevation=1,
+                                    content_cls=alert_message, buttons=[self.delete_cancel_button, self.delete_confirm_button], )
+        self.delete_project_popup.open()
+    
+    def on_confirm_delete_project(self, button):
+        debug(self, button)
+        app.projetos = [p for p in app.projetos if p['nome'] != app.curproject['nome']]    #remove projeto
+        self.delete_project_popup.dismiss()             #fecha a tela
+        setattr(app.root, 'current', 'MainScreen')      #retorna para tela anterior
+    
+    def on_cancel_delete_project(self, button):
+        self.delete_project_popup.dismiss()
 
 #%% tela de alunos/pessoas
 
@@ -770,50 +803,19 @@ class ProjetoSocial(MDApp):
         #rec the screen size to adjust the table columns
         self.wsize = [Window.system_size[0]//5.8, Window.system_size[1]//5.8] #TODO: fazer pra qq aparelho
         
-        #TODO: TEMP: using test data for now
-        for i in range(4):
-            self.create_test_project(index=i)
-    
     def build(self):
         return Builder.load_string(KV)
     
     def create_project(self, name):
         #cria tabelas de aluno e de eventos
         alunos_df = pd.DataFrame(columns=['id', 'nome'])
-        eventos_df = pd.DataFrame(columns=['id', 'ano'])
+        eventos_df = pd.DataFrame(columns=['id', 'data', 'hora'])
         #constroi o projeto
         projeto = {'nome':name, 'alunos':alunos_df, 'eventos':eventos_df,
                    'lastpersonid':0, 'lasteventid':0}
         #adiciona ao dicionario
         self.projetos.append(projeto)
         self.curproject = self.projetos[-1]
-    
-    #TODO: TEMP: cria dados de teste para começar com alguma coisa durante o desenvolvimento
-    def create_test_project(self, index=0):
-        index = index + 2
-        #alunos
-        alunos_df = pd.DataFrame()
-        alunos_df['id'] = [x+1 for x in range(index)]
-        alunos_df['nome'] = [f'Aluno {x+1}' for x in range(index)]
-        # alunos_df['__freq__1234'] = [[] for x in range(index)]
-        for i in range(7):
-            alunos_df[f'coluna{i}'] = [f'valor {i}' for x in range(index)]
-        alunos_df.index = alunos_df.id
-        print(alunos_df)
-        #eventos
-        eventos_df = pd.DataFrame()
-        eventos_df['id'] = [x+1 for x in range(index)]
-        eventos_df['ano'] = [2022 for x in range(index)]
-        eventos_df.index = eventos_df.id
-        print(eventos_df)
-        #constroi o projeto
-        projeto = {'nome':f'Projeto Exemplo {index+1}', 'alunos':alunos_df, 'eventos':eventos_df,
-                       'lastpersonid':index, 'lasteventid':index}
-        #adiciona
-        self.projetos.append(projeto)
-        self.curproject = self.projetos[-1]
-
-
 
 #%% debug
 
