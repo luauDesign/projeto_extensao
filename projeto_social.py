@@ -159,8 +159,8 @@ class MainScreen(Screen):
         #tabela #TODO: carregar se ja existir, ou criar se nao existir
         data_table = MDDataTable(size_hint=(1, dp(app.wsize[0])), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
                                  use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
-                                 column_data=[('nome', dp(app.wsize[0])),(f'', 1)], #a segunda coluna vazia evita um bug
-                                 row_data=[(app.projetos[x]['nome'], f'') for x in range(len(app.projetos))] )
+                                 column_data=[('nome', dp(app.wsize[0])),('', 1)], #a segunda coluna vazia evita um bug
+                                 row_data=[(app.projetos[x]['nome'], '') for x in range(len(app.projetos))] )
         data_table.ids.container.remove_widget(data_table.header)
         data_table.sorted_on = "ID"
         data_table.sorted_order = "ASC" #"DSC"
@@ -169,15 +169,12 @@ class MainScreen(Screen):
         layout.add_widget(data_table)
         
         #----------------------------------------------------------------------
-        #barra inferior #TODO: add filtros e busca
-        
+        #barra inferior #TODO: add filtros e busca        
         bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(bottom_line)
-                
         #spacer 
         spacer = Widget(size_hint_x=1)
         bottom_line.add_widget(spacer)
-        
         #botao para adicionar um novo projeto
         event_button = MDIconButton(icon='archive-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
         event_button.bind(on_release=self.on_add_row)
@@ -186,15 +183,10 @@ class MainScreen(Screen):
     #--------------------------------------------------------------------------
     #quando o usuário toca numa celula da tabela
     def on_row_press(self, instance_table, instance_row):
-        print(f'tela de projetos -> on_row_press: {instance_row.text}')
-        
-        #TODO: isso sao variaveis para debuggar, pode apagar depois
-        global itable, irow 
-        itable, irow = instance_table, instance_row
-        
+        debug(self, instance_table, instance_row)
         #indentify which project the row belongs to #can't use the parent.children index because it loads and unloads rows dynamically
         for i in range(len(app.projetos)):
-            if app.projetos[i]['nome']==irow.text:
+            if app.projetos[i]['nome']==instance_row.text:
                 #set it as the current project and switch to the project screen
                 app.curproject = app.projetos[i]
                 if type(app.root.transition) != FadeTransition:
@@ -205,49 +197,31 @@ class MainScreen(Screen):
     #--------------------------------------------------------------------------
     #popup do botao de adicionar projeto
     def on_add_row(self, button):
-        #campo de texto para o nome
-        self.new_row_name_field = MDTextField(hint_text="Digite um nome para o projeto", required=True)
-        
-        #função para verificar se há texto no campo, para habilitar e desabilitar o botao confirmar
-        self.new_row_name_field.bind(text=self.on_new_name_text_changed)
-        
-        #botão confirmar (inicialmente desabilitado
+        #campo de texto para o nome e funcao para quando o texto muda
+        self.text_field = MDTextField(hint_text="Digite um nome para o projeto", required=True)
+        self.text_field.bind(text=self.on_new_name_text_changed)
+        #botoes confirmar (inicialmente desabilitado) e cancelar
         self.new_row_confirm_button = MDFillRoundFlatButton(
             text="Confirmar", on_release=self.confirm_row_creation, disabled=True)
-        
-        #botao cancelar
         self.new_row_cancel_button = MDFillRoundFlatButton(
             text="Cancelar", on_release=self.cancel_row_creation, md_bg_color=CANCEL_BUTTON_COLOR)
-        
         #monta e abre a caixa de dialogo
-        self.new_row_dialog = MDDialog(
-            title="Criar novo projeto",
-            type="custom", elevation=1,
-            content_cls=self.new_row_name_field,
-            buttons=[self.new_row_cancel_button,
-                     self.new_row_confirm_button],
-            )
-        self.new_row_dialog.open()
-        
+        self.add_popup = MDDialog(title="Criar novo projeto", type="custom",
+            elevation=1, content_cls=self.text_field,
+            buttons=[self.new_row_cancel_button, self.new_row_confirm_button], )
+        self.add_popup.open()
+    
     def on_new_name_text_changed(self, instance, value):
         self.new_row_confirm_button.disabled = not value.strip()
     
     def cancel_row_creation(self, button):
-        self.new_row_dialog.dismiss()
+        self.add_popup.dismiss()
     
     def confirm_row_creation(self, button):
-        print('criando novo projeto!')
-        name_input = self.new_row_name_field.text
-        
-        #TODO: cria a row na tabela do kivymd
-        
-        #TODO: cria a row no dataframe
-        
-        
-        #fecha a caixa
-        self.new_row_dialog.dismiss()
-   
-
+        self.data_table.add_row((self.text_field.text, ''))     #add na tabela
+        app.create_project(self.text_field.text)                #cria o projeto
+        self.add_popup.dismiss()    #fecha a caixa
+    
 #%% tela do projeto: alunos
 
 class ProjectAlunosScreen(Screen):
@@ -264,18 +238,15 @@ class ProjectAlunosScreen(Screen):
         #cabeçalho
         header_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(header_line)
-        
         #botao para voltar pra tela principal
         home_button = MDIconButton(icon='home', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
         home_button.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
         header_line.add_widget(home_button)
-        
         #titulo
         label = MDLabel(text=f' \n{app.curproject["nome"]}',
                         theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
         header_line.add_widget(label)
-        
         #botao para ir para a tela de eventos
         event_button = MDIconButton(icon='clipboard-clock', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
         event_button.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectEventosScreen'))
@@ -287,7 +258,6 @@ class ProjectAlunosScreen(Screen):
         #dataframe dos alunos
         freq_cols = [col for col in app.curproject['alunos'].columns if '__freq__' in col]
         alunos_df = app.curproject['alunos'].drop(columns=freq_cols)
-        
         #kivymd data table
         data_table = MDDataTable(size_hint=(1, dp(app.wsize[0])), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
                                  use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
@@ -301,99 +271,106 @@ class ProjectAlunosScreen(Screen):
         
         #----------------------------------------------------------------------
         #barra inferior
-        
         bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(bottom_line)
-        
+        #botao para apagar o projeto
+        delete_project_button = MDIconButton(icon='archive-minus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        delete_project_button.bind(on_release=self.show_delete_project_popup)
+        bottom_line.add_widget(delete_project_button)
         #spacer 
         spacer = Widget(size_hint_x=1)
         bottom_line.add_widget(spacer)
-        
         #botao para adicionar um novo aluno
-        event_button = MDIconButton(icon='account-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
-        event_button.bind(on_release=self.on_add_row)
-        bottom_line.add_widget(event_button)
+        add_aluno_button = MDIconButton(icon='account-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
+        add_aluno_button.bind(on_release=self.show_add_aluno_popup)
+        bottom_line.add_widget(add_aluno_button)
     
     #--------------------------------------------------------------------------
     #quando o usuário toca numa celula da tabela
     def on_row_press(self, instance_table, instance_row):
-        print(f'tela de projeto:pessoas -> on_row_press: {instance_row.text}')
-        
-        #TODO: isso sao variaveis para debuggar, pode apagar depois
-        global itable, irow
-        itable, irow = instance_table, instance_row
-        
         #get the id of the row
         if (instance_row.index % 2) == 0:
-            row_id = irow.parent.children[-irow.index-1].text
+            row_id = instance_row.parent.children[-instance_row.index-1].text
         else:
-            row_id = irow.parent.children[-irow.index].text
-        print('row_id:', row_id)
-        
+            row_id = instance_row.parent.children[-instance_row.index].text
         #identify which person the row belongs to
-        #por enquanto só para 2 colunas, com a primeira especificamente sendo 'id'
+        #por enquanto só para 2 colunas ('id', 'nome')
         idvalues = app.curproject['alunos']['id'].values
         for i in range(len(idvalues)):
             if f"{idvalues[i]}"==f'{row_id}':
                 #set it as the current person and go to the screen
-                app.curpersonid = i
                 app.curpersonindex = app.curproject['alunos']['id'].values[i]
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
-                # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
                 app.root.current = 'SubjectScreen'
     
     #--------------------------------------------------------------------------
-    #popup do botao de adicionar pessoa
-    def on_add_row(self, button):
-        #campo de texto para o nome
-        self.new_row_name_field = MDTextField(hint_text="Digite um nome para a pessoa", required=True)
-        
-        #função para verificar se há texto no campo, para habilitar e desabilitar o botao confirmar
-        self.new_row_name_field.bind(text=self.on_new_name_text_changed)
-        
-        #botão confirmar (inicialmente desabilitado
+    #popup de adicionar pessoa
+    def show_add_aluno_popup(self, button):
+        #campo de texto para o nome e funcao pra verificar alterações
+        self.text_field = MDTextField(hint_text="Digite um nome para a pessoa", required=True)
+        self.text_field.bind(text=self.on_new_name_text_changed)
+        #botoes confirmar (inicialmente desabilitado) e cancelar
         self.new_row_confirm_button = MDFillRoundFlatButton(
             text="Confirmar", on_release=self.confirm_row_creation, disabled=True)
-        
-        #botao cancelar
         self.new_row_cancel_button = MDFillRoundFlatButton(
             text="Cancelar", on_release=self.cancel_row_creation, md_bg_color=CANCEL_BUTTON_COLOR)
-        
-        #monta e abre a caixa de dialogo
-        self.new_row_dialog = MDDialog(
-            title="Registrar nova pessoa",
-            type="custom", elevation=1,
-            content_cls=self.new_row_name_field,
-            buttons=[self.new_row_cancel_button,
-                     self.new_row_confirm_button],
-            )
+        #popup
+        self.new_row_dialog = MDDialog( title="Registrar nova pessoa",
+            type="custom", elevation=1, content_cls=self.text_field,
+            buttons=[self.new_row_cancel_button, self.new_row_confirm_button], )
         self.new_row_dialog.open()
         
     def on_new_name_text_changed(self, instance, value):
-        self.new_row_confirm_button.disabled = not value.strip()
+        self.new_row_confirm_button.disabled = not value.strip() #precisa ter um nome
     
     def cancel_row_creation(self, button):
         self.new_row_dialog.dismiss()
     
     def confirm_row_creation(self, button):
-        print('criando novo aluno!')
-        name_input = self.new_row_name_field.text
-        
-        #TODO: cria a row na tabela do kivymd
-        
-        #TODO: cria a row no dataframe
-        
-        
+        #add na tabela
+        app.curproject['lastpersonid'] = app.curproject['lastpersonid'] + 1
+        self.data_table.add_row((app.curproject['lastpersonid'], self.text_field.text))
+        #add no dataframe (depis recria o index que vai perder na adicao)
+        app.curproject['alunos'] = app.curproject['alunos']._append(
+            {'id':app.curproject['lastpersonid'], 'nome':self.text_field.text}, ignore_index=True)
+        app.curproject['alunos'].index = app.curproject['alunos'].id
         #fecha a caixa
         self.new_row_dialog.dismiss()
+    
+    #--------------------------------------------------------------------------
+    #popup de deletar o projeto
+    
+    def show_delete_project_popup(self, button):
+        #botoes confirmar (inicia desabilitado) e cancelar
+        self.delete_confirm_button = MDFillRoundFlatButton(
+            text='Confirmar', on_release=self.on_confirm_delete_project, disabled=False)
+        self.delete_cancel_button = MDFillRoundFlatButton(
+            text='Cancelar', on_release=self.on_cancel_delete_project, md_bg_color=CANCEL_BUTTON_COLOR)
+        #texto informando que apaga permanentemente o projeto
+        alert_message = MDLabel(
+            text=f'Atenção! Você está prestes a apagar permanentemente o projeto "{app.curproject["nome"]}". Todos os dados do projeto serão perdidos!',
+            theme_text_color="Error", size_hint_y=None, height=dp(55), )
+        #popup
+        self.delete_project_popup = MDDialog(title='Confirmação de apagar campo', type='custom', elevation=1,
+                                    content_cls=alert_message, buttons=[self.delete_cancel_button, self.delete_confirm_button], )
+        self.delete_project_popup.open()
+    
+    def on_confirm_delete_project(self, button):
+        debug(self, button)
+        app.projetos = [p for p in app.projetos if p['nome'] != app.curproject['nome']]    #remove projeto
+        self.delete_project_popup.dismiss()             #fecha a tela
+        setattr(app.root, 'current', 'MainScreen')      #retorna para tela anterior
+    
+    def on_cancel_delete_project(self, button):
+        self.delete_project_popup.dismiss()
 
 #%% tela do projeto: eventos
 
 class ProjectEventosScreen(Screen):
-    data_table = None
-    picked_date = None
-    picked_time = None
+    # data_table = None
+    # picked_date = None
+    # picked_time = None
     
     def on_pre_enter(self, *args):
         self.clear_widgets()
@@ -406,25 +383,22 @@ class ProjectEventosScreen(Screen):
         #cabeçalho
         header_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(header_line)
-        
         #botao para voltar pra tela principal
         home_button = MDIconButton(icon='home', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='left', valign='center', icon_size='32sp')
         home_button.bind(on_release=lambda x: setattr(app.root, 'current', 'MainScreen'))
         header_line.add_widget(home_button)
-        
         #titulo
         label = MDLabel(text=f'{app.curproject["nome"]}',
                         theme_text_color='Custom', text_color='white', font_style='H6', halign='center', valign='center', size_hint=(1, None))
         label.bind(texture_size=lambda instance, value: instance.setter('height')(instance, instance.texture_size[1] + 30))
         header_line.add_widget(label)
-        
         #botao para ir para a tela de eventos
         btn0 = MDIconButton(icon='account-group', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
         btn0.bind(on_release=lambda x: setattr(app.root, 'current', 'ProjectAlunosScreen'))
         header_line.add_widget(btn0)
         
         #----------------------------------------------------------------------
-        #tabela #TODO: carregar se ja existir, ou criar se nao existir
+        #tabela
         eventos_df = app.curproject['eventos']
         data_table = MDDataTable(size_hint=(1, .9), padding=5, elevation=2, pos_hint={'center_x': 0.5, 'center_y': 0.5}, 
                                  use_pagination=False, rows_num=9999, background_color_cell="white", background_color_selected_cell="white",
@@ -432,7 +406,7 @@ class ProjectEventosScreen(Screen):
                                  row_data=[(x,y) for x,y in zip(eventos_df['id'].values, eventos_df['ano'].values)] )
         # data_table.ids.container.remove_widget(data_table.header)
         data_table.sorted_on = "ID"
-        data_table.sorted_order = "ASC" #"DSC"
+        data_table.sorted_order = "ASC" #ascending/descending
         data_table.bind(on_row_press=self.on_row_press)
         self.data_table = data_table
         layout.add_widget(data_table)
@@ -441,23 +415,17 @@ class ProjectEventosScreen(Screen):
         #barra inferior
         bottom_line = MDBoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(50), minimum_height=0)
         layout.add_widget(bottom_line)
-        
-        #spacer 
-        spacer = Widget(size_hint_x=1)
-        bottom_line.add_widget(spacer)
-        
+        #spacer
+        bottom_line.add_widget( Widget(size_hint_x=1) )
         #botao para adicionar um novo evento(clock-plus, calendar-plus)
         event_button = MDIconButton(icon='calendar-plus', theme_text_color="Custom", text_color=(1, 1, 1, 1), halign='right', valign='center', icon_size='32sp')
-        event_button.bind(on_release=self.on_add_row)
+        event_button.bind(on_release=self.show_add_event_popup)
         bottom_line.add_widget(event_button)
     
     #--------------------------------------------------------------------------
     def on_row_press(self, instance_table, instance_row):
         print(f'tela de projeto:eventos -> on_row_press: {instance_row.text}')
-        
-        #TODO: isso sao variaveis para debuggar, pode apagar depois
-        global itable, irow
-        itable, irow = instance_table, instance_row
+        debug(self, instance_table, instance_row)
         
         #get the id of the row
         if (instance_row.index % 2) == 0:
@@ -466,27 +434,24 @@ class ProjectEventosScreen(Screen):
             row_id = irow.parent.children[-irow.index].text
         print('row_id:', row_id)
         
-        #indentify which person the row belongs to
-        #por enquanto só para 2 colunas, com a primeira especificamente sendo 'id'
+        #indentify which event the row belongs to #por enquanto só para 2 colunas, com a primeira especificamente sendo 'id'
         idvalues = app.curproject['eventos']['id'].values
         for i in range(len(idvalues)):
             #find the person
             if f"{idvalues[i]}"==f'{row_id}':
                 print(idvalues[i], '==', row_id)
                 # set it as the current person
-                app.cureventid = i
+                app.cureventindex = app.curproject['eventos']['id'].values[i]
                 #config the transition if not already configured
                 if type(app.root.transition) != FadeTransition:
                     app.root.transition = FadeTransition()
                 #go to the person screen
-                # self.clear_widgets() #limpa antes de sair para nao aparecer o antigo quando voltar pra essa tela
                 app.root.current = 'EventScreen'
     
     #--------------------------------------------------------------------------
     #popups do botao de adicionar evento
-    def on_add_row(self, button):
+    def show_add_event_popup(self, button):
         self.show_date_picker()
-        # self.show_time_picker() #TODO: TEMP enquanto debuga o time picker
 
     def show_date_picker(self):
         date_dialog = MDDatePicker(elevation=1)
@@ -494,47 +459,25 @@ class ProjectEventosScreen(Screen):
         date_dialog.open()
     
     def on_confirm_date(self, instance, value, date_range):
-        '''
-        :type instance: <kivymd.uix.picker.MDDatePicker object>;
-        :param value: selected date;
-        :type value: <class 'datetime.date'>;
-        :param date_range: list of 'datetime.date' objects in the selected range;
-        :type date_range: <class 'list'>;
-        '''
         self.show_time_picker()
 
     def show_time_picker(self):
         time_dialog = MDTimePicker()
         time_dialog.bind(time=self.on_change_time, on_save=self.on_confirm_time)
-        
-        #TODO: debug
-        global timepicker
-        timepicker = time_dialog
-        
         #titulo
         time_dialog.title = 'ESCOLHA A HORA'
-        
         #botoes OK e CANCEL #TODO: deixar todos no mesmo padrão
         ok_button = time_dialog.children[0].children[0]
         ok_button.text = 'OK'
         cancel_button = time_dialog.children[0].children[1]
         cancel_button.text = 'CANCELA'
-        
         #label HORA e MINUTO
         time_dialog.children[0].children[5].text = 'Minuto'
         time_dialog.children[0].children[6].text = 'Hora'
-        
         #TODO: modo 24 horas, precisa extender a classe
-        
-        #done
         time_dialog.open()
     
     def on_change_time(self, instance, time_obj):
-        '''
-        The method returns the set time.
-        :type instance: <kivymd.uix.picker.MDTimePicker object>
-        :type time: <class 'datetime.time'>
-        '''
         return time_obj
     
     def on_confirm_time(self, instance, time_obj):
@@ -558,7 +501,7 @@ class SubjectScreen(Screen):
         
         #informacoes do aluno (o id e a frequencia são ignorados na tabela)
         aluno_df = pd.DataFrame()
-        aluno_row =  [*app.curproject['alunos'].iloc(0)[app.curpersonid].values]
+        aluno_row =  [*app.curproject['alunos'].loc[app.curpersonindex].values]
         aluno_id = aluno_row[0]
         aluno_name = aluno_row[1]
         freq_cols = [col for col in app.curproject['alunos'].columns if '__freq__' in col]
@@ -744,7 +687,7 @@ class SubjectScreen(Screen):
         self.add_popup.dismiss()
     
     #--------------------------------------------------------------------------
-    #TODO: popup do botao de excluir aluno
+    #popup para excluir aluno
     
     def open_delete_aluno_popup(self, button):
         debug(self, button)
@@ -773,7 +716,7 @@ class SubjectScreen(Screen):
         setattr(app.root, 'current', 'ProjectAlunosScreen')     #volta pra tela anterior
         
     
-#%% tela de aulas/eventos
+#%% #TODO: tela de aulas/eventos
 
 class EventScreen(Screen):
     
@@ -805,8 +748,8 @@ class ProjetoSocial(MDApp):
     #stores the project list, each project is a dict with a name plus two pandas dataframes
     projetos = []
     curproject = None
-    curpersonid, curpersonindex = 0, 0
-    cureventid, cureventindex = 0, 0
+    curpersonindex = 0
+    cureventindex = 0
     wsize = None
     
     def __init__(self, **kwargs):
@@ -835,63 +778,42 @@ class ProjetoSocial(MDApp):
         return Builder.load_string(KV)
     
     def create_project(self, name):
-        if name==None:
-            pass #TODO: handle it
-        
-        #cria tabelas de aluno e de eventos, com os campos fixos
-        alunos_df = pd.DataFrame()
-        alunos_df.columns = ['id', 'nome']
-        eventos_df = pd.DataFrame()
-        eventos_df.columns = ['id', 'ano']
-        
+        #cria tabelas de aluno e de eventos
+        alunos_df = pd.DataFrame(columns=['id', 'nome'])
+        eventos_df = pd.DataFrame(columns=['id', 'ano'])
         #constroi o projeto
-        projeto = {'nome':f'name', 'alunos':alunos_df, 'eventos':eventos_df}
-        
-        #adiciona
+        projeto = {'nome':name, 'alunos':alunos_df, 'eventos':eventos_df,
+                   'lastpersonid':0, 'lasteventid':0}
+        #adiciona ao dicionario
         self.projetos.append(projeto)
         self.curproject = self.projetos[-1]
-        pass
     
     #TODO: TEMP: cria dados de teste para começar com alguma coisa durante o desenvolvimento
-    def create_test_project(self, index=1):
+    def create_test_project(self, index=0):
+        index = index + 2
         #alunos
         alunos_df = pd.DataFrame()
-        alunos_df['id'] = [x+1 for x in range(10+index)]
-        alunos_df['nome'] = [f'Aluno {x+1}' for x in range(10+index)]
-        alunos_df['__freq__1234'] = [[] for x in range(10+index)]
+        alunos_df['id'] = [x+1 for x in range(index)]
+        alunos_df['nome'] = [f'Aluno {x+1}' for x in range(index)]
+        # alunos_df['__freq__1234'] = [[] for x in range(index)]
         for i in range(7):
-            alunos_df[f'coluna{i}'] = [f'valor {i}' for x in range(10+index)]
+            alunos_df[f'coluna{i}'] = [f'valor {i}' for x in range(index)]
         alunos_df.index = alunos_df.id
+        print(alunos_df)
         #eventos
         eventos_df = pd.DataFrame()
-        eventos_df['id'] = [x+1 for x in range(20+index)]
-        eventos_df['ano'] = [2022 for x in range(20+index)]
+        eventos_df['id'] = [x+1 for x in range(index)]
+        eventos_df['ano'] = [2022 for x in range(index)]
         eventos_df.index = eventos_df.id
+        print(eventos_df)
         #constroi o projeto
-        if index==0:
-            projeto = {'nome':f'Futsal Sub 16', 'alunos':alunos_df, 'eventos':eventos_df}
-        elif index==1:
-            projeto = {'nome':f'Futsal Sub 20', 'alunos':alunos_df, 'eventos':eventos_df}
-        elif index==2:
-            projeto = {'nome':f'Jiujitsu', 'alunos':alunos_df, 'eventos':eventos_df}
-        else:
-            projeto = {'nome':f'Projeto Exemplo {index+1}', 'alunos':alunos_df, 'eventos':eventos_df}
+        projeto = {'nome':f'Projeto Exemplo {index+1}', 'alunos':alunos_df, 'eventos':eventos_df,
+                       'lastpersonid':index, 'lasteventid':index}
         #adiciona
         self.projetos.append(projeto)
         self.curproject = self.projetos[-1]
-        pass
 
-#%% data handling
 
-#TODO: extrai as colunas do dataframe no formato que o kivymd usa
-
-#TODO: extrai as linhas do dataframe no formato que o kivymd usa
-
-#TODO: add new row to data table
-
-#TODO: add new row to dataframe
-
-#TODO: muito a fazer, salvar e carregar projetos, exportar/importar csv e json...
 
 #%% debug
 
